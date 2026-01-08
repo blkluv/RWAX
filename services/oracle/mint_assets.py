@@ -204,37 +204,211 @@ def create_amm_pool(issuer_wallet, asset_data):
             return False
 
 
+def create_amm_pool_for_token(issuer_wallet, ticker, currency_code, project_name, token_type):
+    """
+    [XLS-30 Implementation] Helper function to create AMM pool for a specific token
+    
+    Creates an AMM pool for a given token (PT or YT) with XRP.
+    
+    Args:
+        issuer_wallet: Wallet issuing the token
+        ticker: Token ticker (e.g., "PT-SUN" or "YT-SUN-28")
+        currency_code: Hex currency code for the token
+        project_name: Property project name
+        token_type: "Principal Token" or "Yield Token"
+    
+    Returns:
+        bool: True if pool created or exists, False otherwise
+    """
+    console.print(f"   [dim]Creating {token_type} AMM pool ({ticker}/XRP)...[/dim]")
+    
+    # Check if AMM exists
+    with console.status(f"[dim]Checking {token_type} pool...", spinner="dots"):
+        try:
+            from xrpl.models.requests import AMMInfo
+            amm_info = client.request(AMMInfo(
+                asset={
+                    "currency": currency_code,
+                    "issuer": issuer_wallet.classic_address
+                },
+                asset2="XRP"
+            ))
+            if amm_info.result.get('amm'):
+                console.print(f"   [yellow]⚠️[/yellow] [dim]{token_type} AMM pool already exists[/dim]")
+                return True
+        except:
+            pass  # AMM doesn't exist, proceed to create
+    
+    # Create AMM pool
+    try:
+        token_amount = {
+            "currency": currency_code,
+            "issuer": issuer_wallet.classic_address,
+            "value": "10000"  # 10,000 tokens
+        }
+        
+        tx = AMMCreate(
+            account=issuer_wallet.classic_address,
+            amount=token_amount,
+            amount2={"currency": "XRP", "value": "100"},  # 100 XRP
+            trading_fee=500,  # 0.5%
+        )
+        result = submit_and_wait(tx, client, issuer_wallet)
+        console.print(f"   [green]✅[/green] [dim]{token_type} AMM pool created[/dim]")
+        return True
+    except Exception as e:
+        console.print(f"   [yellow]⚠️[/yellow] {token_type} AMM failed: [dim]{str(e)[:50]}...[/dim]")
+        return False
+
+
+def mint_mock_rlusd(issuer_wallet=None, distribution_addresses=None):
+    """
+    [Mock RLUSD Implementation] Mint Testnet RLUSD Token
+    
+    Creates a mock RLUSD (Ripple-Linked USD) token for testing Asset-to-Asset swaps.
+    This is a testnet-only token for demonstration purposes.
+    
+    Args:
+        issuer_wallet: Wallet to issue RLUSD from (if None, generates new one)
+        distribution_addresses: List of addresses to send RLUSD to (testnet wallets)
+    
+    Returns:
+        dict with RLUSD chain_info (issuer, currency, ticker)
+    """
+    console.print()
+    console.print(Panel.fit(
+        "[bold green]💰 MOCK RLUSD TOKEN[/bold green]\n"
+        "[dim]Creating testnet RLUSD for Asset-to-Asset swaps[/dim]",
+        border_style="green"
+    ))
+    
+    # Use provided wallet or generate new one
+    if issuer_wallet is None:
+        issuer_wallet = get_free_issuer_wallet()
+    
+    rlusd_ticker = "RLUSD"
+    rlusd_currency = str_to_hex(rlusd_ticker).ljust(40, '0')
+    
+    # Configure issuer with clawback (XLS-39)
+    configure_issuer(issuer_wallet)
+    
+    console.print(f"[bold green]✅[/bold green] RLUSD Token configured")
+    console.print(f"   [dim]Ticker:[/dim] {rlusd_ticker}")
+    console.print(f"   [dim]Currency Code:[/dim] {rlusd_currency}")
+    console.print(f"   [dim]Issuer:[/dim] {issuer_wallet.classic_address}")
+    
+    # Create RLUSD/XRP AMM pool for liquidity
+    console.print(f"[bold magenta]💧[/bold magenta] Creating RLUSD/XRP AMM Pool...")
+    amm_created = create_amm_pool_for_token(
+        issuer_wallet,
+        rlusd_ticker,
+        rlusd_currency,
+        "RLUSD",
+        "RLUSD Token"
+    )
+    
+    # Update to use larger pool size for RLUSD
+    if not amm_created:
+        try:
+            token_amount = {
+                "currency": rlusd_currency,
+                "issuer": issuer_wallet.classic_address,
+                "value": "100000"  # 100k RLUSD
+            }
+            
+            tx = AMMCreate(
+                account=issuer_wallet.classic_address,
+                amount=token_amount,
+                amount2={"currency": "XRP", "value": "1000"},  # 1000 XRP
+                trading_fee=300,  # 0.3%
+            )
+            result = submit_and_wait(tx, client, issuer_wallet)
+            console.print("[bold green]✅[/bold green] RLUSD/XRP AMM pool created")
+            amm_created = True
+        except Exception as e:
+            console.print(f"[yellow]⚠️[/yellow] RLUSD AMM creation failed: [dim]{str(e)[:50]}...[/dim]")
+    
+    # Distribute RLUSD to test wallets (if provided)
+    if distribution_addresses:
+        console.print(f"[bold cyan]📤[/bold cyan] Distributing RLUSD to {len(distribution_addresses)} wallets...")
+        from xrpl.models.transactions import Payment
+        from xrpl.models.amounts import IssuedCurrencyAmount
+        
+        for addr in distribution_addresses:
+            try:
+                payment = Payment(
+                    account=issuer_wallet.classic_address,
+                    destination=addr,
+                    amount=IssuedCurrencyAmount(
+                        currency=rlusd_currency,
+                        issuer=issuer_wallet.classic_address,
+                        value="10000"  # 10,000 RLUSD per wallet
+                    )
+                )
+                submit_and_wait(payment, client, issuer_wallet)
+                console.print(f"   [dim]Sent 10,000 RLUSD to {addr[:8]}...[/dim]")
+            except Exception as e:
+                console.print(f"   [yellow]⚠️[/yellow] Failed to send to {addr}: [dim]{str(e)[:50]}...[/dim]")
+    
+    return {
+        "issuer": issuer_wallet.classic_address,
+        "currency": rlusd_currency,
+        "ticker": rlusd_ticker,
+        "amm_exists": amm_created
+    }
+
+
 def mint_asset_on_chain(issuer_wallet, asset_data, index):
     """
-    Complete Asset Lifecycle: Token Minting + Oracle + AMM
+    Complete Asset Lifecycle: Token Minting (PT + YT) + Oracle + AMM
+    
+    Now mints BOTH Principal Token (PT) and Yield Token (YT) as separate
+    Issued Currencies for Asset-to-Asset swap support.
     
     Implements three XRPL standards:
     - [XLS-47] Oracle price publication
-    - [XLS-30] AMM liquidity pool creation
+    - [XLS-30] AMM liquidity pool creation (for both PT and YT)
     - [XLS-33] Multi-Purpose Tokens (using Issued Currency standard)
     
     Returns chain_info dictionary with all on-chain asset details.
     """
-    ticker = asset_data['financials']['tokens']['yt_ticker']
-    currency_code = str_to_hex(ticker).ljust(40, '0')
+    yt_ticker = asset_data['financials']['tokens']['yt_ticker']
+    pt_ticker = asset_data['financials']['tokens'].get('pt_ticker', f"PT-{yt_ticker.split('-')[1]}")
+    
+    yt_currency = str_to_hex(yt_ticker).ljust(40, '0')
+    pt_currency = str_to_hex(pt_ticker).ljust(40, '0')
+    
     project_name = asset_data['identity']['project']
     
     # Header panel for each asset
     console.print()
     console.print(Panel.fit(
         f"[bold cyan]#{index + 1}[/bold cyan] [bold white]{project_name}[/bold white]\n"
-        f"[dim]Ticker: {ticker} | District: {asset_data['identity']['district']}[/dim]",
+        f"[dim]PT: {pt_ticker} | YT: {yt_ticker} | District: {asset_data['identity']['district']}[/dim]",
         border_style="cyan"
     ))
     
+    # Chain info now includes both tokens
     chain_info = {
         "issuer": issuer_wallet.classic_address,
-        "currency": currency_code,
-        "ticker": ticker,
+        "tokens": {
+            "pt": {
+                "currency": pt_currency,
+                "ticker": pt_ticker
+            },
+            "yt": {
+                "currency": yt_currency,
+                "ticker": yt_ticker
+            }
+        },
         "human_name": project_name
     }
     
-    # [XLS-47 Implementation] Set Oracle Price
+    # For backward compatibility, keep old structure (YT as default)
+    chain_info["currency"] = yt_currency
+    chain_info["ticker"] = yt_ticker
+    
+    # [XLS-47 Implementation] Set Oracle Price (for YT token)
     oracle_doc_id = hex(int(time.time()) + index)[2:]
     oracle_id = set_oracle_price(issuer_wallet, asset_data, oracle_doc_id)
     chain_info['oracle'] = {
@@ -243,20 +417,49 @@ def mint_asset_on_chain(issuer_wallet, asset_data, index):
         "price_set": True
     }
     
-    # [XLS-30 Implementation] Create AMM Pool
-    amm_created = create_amm_pool(issuer_wallet, asset_data)
+    # [XLS-30 Implementation] Create AMM pools for BOTH PT and YT
+    console.print(f"[bold magenta]💧[/bold magenta] Creating AMM Pools...")
+    
+    # YT/XRP Pool
+    yt_amm = create_amm_pool_for_token(
+        issuer_wallet,
+        yt_ticker,
+        yt_currency,
+        project_name,
+        "Yield Token"
+    )
+    
+    # PT/XRP Pool
+    pt_amm = create_amm_pool_for_token(
+        issuer_wallet,
+        pt_ticker,
+        pt_currency,
+        project_name,
+        "Principal Token"
+    )
+    
     chain_info['amm'] = {
-        "exists": amm_created,
-        "trading_fee": 0.5,
-        "liquidity_provided": amm_created
+        "yt": {
+            "exists": yt_amm,
+            "trading_fee": 0.5,
+            "pool": "YT/XRP"
+        },
+        "pt": {
+            "exists": pt_amm,
+            "trading_fee": 0.5,
+            "pool": "PT/XRP"
+        }
     }
     
+    # Backward compatibility: legacy amm structure
+    chain_info['amm']['exists'] = yt_amm or pt_amm
+    chain_info['amm']['trading_fee'] = 0.5
+    chain_info['amm']['liquidity_provided'] = yt_amm or pt_amm
+    
     # [XLS-33 Implementation] Token Standard
-    # Note: Full MPT support is experimental in xrpl-py
-    # We use Issued Currency with Rich Metadata (production-ready approach)
     chain_info['token_standard'] = "XLS-33 (Issued Currency)"
     
-    console.print(f"[bold green]✅[/bold green] [bold]Asset fully configured on-chain[/bold]")
+    console.print(f"[bold green]✅[/bold green] [bold]Both tokens configured on-chain[/bold]")
     time.sleep(1)  # Brief pause for readability
     
     return chain_info
@@ -295,6 +498,22 @@ def main():
     
     # [XLS-39 Implementation] Enable Clawback
     clawback_enabled = configure_issuer(issuer_wallet)
+    
+    # [Mock RLUSD] Create RLUSD token for testing Asset-to-Asset swaps
+    console.print()
+    console.print(Panel.fit(
+        "[bold green]💰 Creating Mock RLUSD Token[/bold green]",
+        border_style="green"
+    ))
+    rlusd_info = mint_mock_rlusd(issuer_wallet)
+    
+    # Save RLUSD info to a separate file for frontend
+    import os
+    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
+    rlusd_file = os.path.join(os.path.dirname(DATA_FILE), "rlusd_info.json")
+    with open(rlusd_file, 'w', encoding='utf-8') as f:
+        json.dump(rlusd_info, f, indent=2)
+    console.print(f"[bold green]✅[/bold green] RLUSD info saved to {rlusd_file}")
     
     # Load asset data
     try:
