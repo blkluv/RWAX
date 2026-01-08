@@ -40,11 +40,20 @@ def format_event(event_type: str, data: dict):
         'did_mint': '✨',
         'ocr_scan': '📄',
         'document_parse': '🧠',
+        'document_upload': '📤',
+        'pdf_extraction_start': '📄',
+        'pdf_page_processing': '📃',
+        'pdf_extraction_complete': '✅',
+        'ocr_scan_start': '👁️',
+        'ocr_progress': '⏳',
+        'ocr_scan_complete': '✅',
+        'document_parsing_start': '🔍',
         'swap_initiate': '💧',
         'swap_complete': '✅',
         'asset_view': '👁️',
         'verification_modal_open': '🛡️',
         'transaction_submit': '📝',
+        'verification_error': '❌',
         'error': '❌',
     }
     
@@ -105,8 +114,26 @@ def log_event():
             console.print(f"[bold green]→[/bold green] DID minted successfully: [cyan]{event_data.get('hash', 'N/A')}[/cyan]")
         elif event_type == 'swap_initiate':
             console.print(f"[bold cyan]→[/bold cyan] AMM swap initiated for: [yellow]{event_data.get('asset', 'N/A')}[/yellow]")
+        elif event_type == 'document_upload':
+            console.print(f"[bold cyan]→[/bold cyan] Document uploaded: [yellow]{event_data.get('fileName', 'N/A')}[/yellow] ([cyan]{event_data.get('fileSize', 'N/A')}[/cyan])")
+        elif event_type == 'pdf_extraction_start':
+            console.print(f"[bold blue]→[/bold blue] Starting PDF extraction: [cyan]{event_data.get('fileName', 'N/A')}[/cyan]")
+        elif event_type == 'pdf_page_processing':
+            console.print(f"[dim]   Processing page {event_data.get('page', '?')}/{event_data.get('totalPages', '?')}[/dim]")
+        elif event_type == 'pdf_extraction_complete':
+            console.print(f"[bold green]→[/bold green] PDF extraction complete: [cyan]{event_data.get('textLength', 0):,}[/cyan] characters from [yellow]{event_data.get('pages', 0)}[/yellow] pages")
+        elif event_type == 'ocr_scan_start':
+            console.print(f"[bold yellow]→[/bold yellow] Starting OCR scan: [cyan]{event_data.get('method', 'N/A')}[/cyan]")
+        elif event_type == 'ocr_progress':
+            console.print(f"[dim]   OCR progress: {event_data.get('progress', 0)}%[/dim]")
+        elif event_type == 'ocr_scan_complete':
+            console.print(f"[bold green]→[/bold green] OCR complete: [cyan]{event_data.get('textLength', 0):,}[/cyan] characters extracted ([yellow]{event_data.get('confidence', 0)}%[/yellow] confidence)")
+        elif event_type == 'document_parsing_start':
+            console.print(f"[bold magenta]→[/bold magenta] Starting document parsing with [cyan]{len(event_data.get('patterns', []))}[/cyan] extraction patterns")
         elif event_type == 'ocr_scan':
             console.print(f"[bold yellow]→[/bold yellow] OCR processing document: [cyan]{event_data.get('fileName', 'N/A')}[/cyan]")
+        elif event_type == 'verification_error':
+            console.print(f"[bold red]→[/bold red] Verification error: [red]{event_data.get('error', 'Unknown error')}[/red]")
         
         return jsonify({"status": "logged", "event_type": event_type})
     
@@ -122,6 +149,67 @@ def get_events():
         "total": len(event_history),
         "events": event_history[-50:]  # Last 50 events
     })
+
+
+@app.route('/api/log-verification', methods=['POST'])
+def log_verification():
+    """Demo endpoint: Log DID verification with extracted data"""
+    try:
+        data = request.get_json()
+        
+        # Extract verification data
+        document_type = data.get('documentType', 'Unknown')
+        extracted_data = data.get('extractedData', {})
+        did_hash = data.get('didHash', 'N/A')
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        
+        # Create a beautiful terminal display
+        console.print("\n")
+        console.rule(f"[bold magenta]📄 DID VERIFICATION - Real-Time Extracted Data[/bold magenta]")
+        console.print(f"[dim][{timestamp}][/dim]")
+        
+        # Display extracted data in a table
+        table = Table(show_header=True, header_style="bold magenta", border_style="magenta")
+        table.add_column("Field", style="cyan", width=20)
+        table.add_column("Value", style="white", width=40)
+        
+        table.add_row("Document Type", document_type)
+        
+        if extracted_data:
+            for key, value in extracted_data.items():
+                if value and value != "Not Found":
+                    # Format the key nicely
+                    display_key = key.replace(/([A-Z])/g, ' $1').strip().title()
+                    table.add_row(display_key, str(value))
+        
+        table.add_row("DID Hash", f"[green]{did_hash}[/green]")
+        table.add_row("Status", "[bold green]✓ Verified & Minted[/bold green]")
+        
+        console.print(table)
+        console.print(f"[bold green]✅[/bold green] DID successfully minted on XRPL Testnet")
+        console.print(f"[dim]Transaction Hash: {did_hash}[/dim]\n")
+        console.rule("[dim]Verification Complete[/dim]\n")
+        
+        # Also log as regular event
+        event_data = {
+            'documentType': document_type,
+            'extractedData': extracted_data,
+            'didHash': did_hash,
+            'timestamp': timestamp
+        }
+        
+        panel = format_event('did_verification_demo', event_data)
+        console.print(panel)
+        
+        return jsonify({
+            "status": "logged",
+            "message": "Verification data logged to terminal",
+            "didHash": did_hash
+        })
+    
+    except Exception as e:
+        console.print(f"[bold red]❌ Error logging verification:[/bold red] {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 def print_banner():
