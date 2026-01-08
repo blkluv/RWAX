@@ -37,3 +37,12 @@ clean_data.
 # Data files
 *.xlsx
 *.xls
+
+# Python environment
+venv/
+__pycache__/
+*.pyc
+
+# Processed data
+data/
+output/
