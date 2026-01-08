@@ -1,22 +1,51 @@
-// apps/frontend/src/App.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { WalletManager } from 'xrpl-connect';
 import { useIdentity } from './hooks/useIdentity';
 import ThreeHero from './components/ThreeHero';
 import rwaData from './data/rwa_assets.json';
 
 interface AppProps {
-  walletManager: any;
+  walletManager: WalletManager;
 }
 
 function App({ walletManager }: AppProps) {
   const [account, setAccount] = useState<any>(null);
-
-  useEffect(() => {
-    walletManager.on('connect', (acc: any) => setAccount(acc));
-    walletManager.on('disconnect', () => setAccount(null));
-  }, []);
+  const connectorRef = useRef<any>(null);
 
   const { hasDID, isLoading } = useIdentity(account?.address);
+
+  useEffect(() => {
+    // 1. Connect the Manager to the UI Component
+    if (connectorRef.current) {
+      connectorRef.current.setWalletManager(walletManager);
+    }
+
+    // 2. Listen for Events
+    const onConnect = (acc: any) => {
+      console.log("Wallet Connected:", acc);
+      setAccount(acc);
+    };
+
+    const onDisconnect = () => {
+      console.log("Wallet Disconnected");
+      setAccount(null);
+    };
+
+    // Subscribe
+    walletManager.on('connect', onConnect);
+    walletManager.on('disconnect', onDisconnect);
+
+    // Check if already connected
+    if (walletManager.account) {
+      setAccount(walletManager.account);
+    }
+
+    // Cleanup
+    return () => {
+      walletManager.off('connect', onConnect);
+      walletManager.off('disconnect', onDisconnect);
+    };
+  }, [walletManager]);
 
   const handleBuy = (asset: any) => {
     if (!account) return alert("Please connect wallet first");
@@ -35,12 +64,17 @@ function App({ walletManager }: AppProps) {
           <span className="text-2xl font-bold tracking-tighter">RWAX</span>
         </div>
         <div className="flex items-center gap-4">
-           {account && (
+          {account && (
             <div className={`text-xs px-3 py-1 rounded-full border ${hasDID ? 'bg-emerald-900/30 border-emerald-500 text-emerald-400' : 'bg-red-900/30 border-red-500 text-red-400'}`}>
               {isLoading ? "Verifying..." : hasDID ? "✅ DID Verified" : "⚠️ Restricted"}
             </div>
           )}
-          <xrpl-wallet-connector primary-wallet="crossmark" background-color="#000000" />
+          {/* THE OFFICIAL XRPL-CONNECT BUTTON */}
+          <xrpl-wallet-connector
+            ref={connectorRef}
+            primary-wallet="crossmark"
+            background-color="#000000"
+          ></xrpl-wallet-connector>
         </div>
       </nav>
 
@@ -60,6 +94,11 @@ function App({ walletManager }: AppProps) {
             RWAX separates ownership from yield. Acquire <strong>Yield Rights (YT)</strong> for instant cash flow
             without the burden of property management. Powered by <strong>Master Lease Agreements</strong>.
           </p>
+          {account && (
+            <p className="mt-4 text-emerald-400 text-sm">
+              Connected: {account.address.slice(0, 6)}...{account.address.slice(-4)}
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
