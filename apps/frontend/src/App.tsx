@@ -12,7 +12,7 @@ function App({ walletManager }: AppProps) {
   const [account, setAccount] = useState<any>(null);
   const connectorRef = useRef<any>(null);
 
-  const { hasDID, isLoading } = useIdentity(account?.address);
+  const { hasDID, isLoading, isMinting, mintDID } = useIdentity(account?.address, walletManager);
 
   useEffect(() => {
     // 1. Connect the Manager to the UI Component
@@ -47,10 +47,20 @@ function App({ walletManager }: AppProps) {
     };
   }, [walletManager]);
 
-  const handleBuy = (asset: any) => {
+  const handleBuy = async (asset: any) => {
     if (!account) return alert("Please connect wallet first");
-    if (!hasDID) return alert("❌ Access Denied: DID Required.");
-    if (asset.chain_info) window.open(`https://testnet.xrpscan.com/account/${asset.chain_info.issuer}`, '_blank');
+
+    // UX FIX: If no DID, prompt to mint immediately
+    if (!hasDID) {
+      const confirm = window.confirm("⚠️ DID Required: You must verify your identity to trade. Mint ID now?");
+      if (confirm) mintDID();
+      return;
+    }
+
+    // If Asset is on-chain, show link (or implement Swap logic next)
+    if (asset.chain_info) {
+      window.open(`https://testnet.xrpscan.com/account/${asset.chain_info.issuer}`, '_blank');
+    }
   };
 
   return (
@@ -58,18 +68,31 @@ function App({ walletManager }: AppProps) {
       {/* 1. BACKGROUND ANIMATION */}
       <ThreeHero />
 
-      {/* 2. NAVIGATION (Transparent) */}
-      <nav className="fixed top-0 w-full p-6 flex justify-between items-center z-50 mix-blend-difference">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl font-bold tracking-tighter">RWAX</span>
+      {/* 2. NAVIGATION */}
+      <nav className="fixed top-0 w-full p-6 flex justify-between items-center z-50 bg-black/50 backdrop-blur-md border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold tracking-tighter">RWAX</h1>
         </div>
+
         <div className="flex items-center gap-4">
           {account && (
-            <div className={`text-xs px-3 py-1 rounded-full border ${hasDID ? 'bg-emerald-900/30 border-emerald-500 text-emerald-400' : 'bg-red-900/30 border-red-500 text-red-400'}`}>
-              {isLoading ? "Verifying..." : hasDID ? "✅ DID Verified" : "⚠️ Restricted"}
-            </div>
+            <>
+              {!hasDID ? (
+                <button
+                  onClick={mintDID}
+                  disabled={isMinting}
+                  className="bg-emerald-500 hover:bg-emerald-400 text-black px-4 py-2 rounded-lg font-bold text-xs animate-pulse transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isMinting ? "VERIFYING..." : "🛡️ VERIFY IDENTITY (MINT DID)"}
+                </button>
+              ) : (
+                <span className="bg-emerald-900/50 border border-emerald-500 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-2">
+                  ✅ Verified Investor
+                </span>
+              )}
+            </>
           )}
-          {/* THE OFFICIAL XRPL-CONNECT BUTTON */}
+
           <xrpl-wallet-connector
             ref={connectorRef}
             primary-wallet="crossmark"
