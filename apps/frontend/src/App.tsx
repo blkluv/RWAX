@@ -1,6 +1,5 @@
 // apps/frontend/src/App.tsx
 import React, { useState, useEffect } from 'react';
-import 'xrpl-connect/style.css'; // Import xrpl-connect styles
 import { useIdentity } from './hooks/useIdentity';
 import ThreeHero from './components/ThreeHero';
 import rwaData from './data/rwa_assets.json';

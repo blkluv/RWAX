@@ -4,6 +4,8 @@ import App from './App'
 import './index.css'
 // The Official XRPL-Commons Tool
 import { WalletManager, XamanAdapter, CrossmarkAdapter } from 'xrpl-connect'
+// Import web component registration
+import 'xrpl-connect/components'
 
 // 1. Configure the Wallet Manager ONCE
 const walletManager = new WalletManager({
