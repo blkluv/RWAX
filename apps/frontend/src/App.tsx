@@ -1,16 +1,15 @@
 // apps/frontend/src/App.tsx
 import React, { useState, useEffect } from 'react';
-import { WalletManager, XamanAdapter, CrossmarkAdapter } from 'xrpl-connect';
+import 'xrpl-connect/style.css'; // Import xrpl-connect styles
 import { useIdentity } from './hooks/useIdentity';
 import ThreeHero from './components/ThreeHero';
 import rwaData from './data/rwa_assets.json';
 
-const walletManager = new WalletManager({
-  adapters: [new XamanAdapter(), new CrossmarkAdapter()],
-  network: 'testnet'
-});
+interface AppProps {
+  walletManager: any;
+}
 
-function App() {
+function App({ walletManager }: AppProps) {
   const [account, setAccount] = useState<any>(null);
 
   useEffect(() => {
