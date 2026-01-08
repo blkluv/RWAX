@@ -1,0 +1,31 @@
+/* LiquidGlass Component Styles */
+/* Implements the liquid glass effect with inset borders and drop shadow */
+
+.liquid-glass-card {
+  position: relative;
+  overflow: hidden;
+  transition: opacity 0.26s ease-out;
+  filter: drop-shadow(-8px -10px 46px rgba(0, 0, 0, 0.37));
+  backdrop-filter: brightness(1.0) blur(0px);
+}
+
+.liquid-glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+  -webkit-box-shadow: 
+    inset 6px 6px 0px -6px rgba(255, 255, 255, 0.7), 
+    inset 0 0 8px 1px rgba(255, 255, 255, 0.7);
+  box-shadow: 
+    inset 6px 6px 0px -6px rgba(255, 255, 255, 0.7), 
+    inset 0 0 8px 1px rgba(255, 255, 255, 0.7);
+}
+
+.liquid-glass-card > * {
+  position: relative;
+  z-index: 1;
+}

@@ -436,8 +436,7 @@ function App({ walletManager }: AppProps) {
       {/* 5. MARKET DEPTH SECTION - Yield Heatmap Visualization */}
       <MarketDepthSection />
 
-      {/* 6. IMPACT HERO SECTION - Final CTA with Particle Assembler */}
-      {/* Note: Add backgroundImage prop when image is provided - place image in /public/images/ */}
+      {/* 6. IMPACT HERO SECTION - Final CTA with Video Background */}
       <ImpactHeroSection />
 
       {/* 7. MAIN CONTENT (Appears after scroll) */}

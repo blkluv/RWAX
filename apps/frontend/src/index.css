@@ -7,6 +7,8 @@
 body {
   margin: 0;
   padding: 0;
+  background-color: #000000;
+  color: #ffffff;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -28,4 +30,82 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+/* Toast Animation */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+/* Wallet Connector Styling - Match RWAX Design */
+/* xrpl-wallet-connector is a web component - style wrapper and use CSS custom properties if available */
+
+.wallet-connector-wrapper-rwax {
+  display: inline-block;
+}
+
+/* Style the web component container */
+.wallet-connector-wrapper-rwax xrpl-wallet-connector {
+  display: inline-block !important;
+  /* Try to style via CSS custom properties if component supports them */
+  --button-bg: #000000;
+  --button-color: #ffffff;
+  --button-hover-bg: #1a1a1a;
+  --button-padding: 8px 24px;
+  --button-font-size: 0.875rem;
+  --button-font-weight: 500;
+  --button-text-transform: uppercase;
+  --button-letter-spacing: 0.05em;
+  --button-border-radius: 0;
+}
+
+/* Attempt to style internal elements (may not work due to Shadow DOM) */
+.wallet-connector-wrapper-rwax ::ng-deep button,
+.wallet-connector-wrapper-rwax /deep/ button {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 8px 24px !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  font-family: sans-serif !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s !important;
+}
+
+/* Global fallback styles */
+xrpl-wallet-connector {
+  display: inline-block;
+}
+
+/* If the component exposes CSS parts, use them */
+xrpl-wallet-connector::part(button) {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 8px 24px !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  font-family: sans-serif !important;
+}
+
+xrpl-wallet-connector::part(button):hover {
+  background-color: #1a1a1a !important;
 }

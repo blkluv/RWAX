@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js Matrix Effect</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+    }
+  }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// =========================================
+// STEP 1: Generate the Font Texture Atlas
+// =========================================
+// We create a 2D canvas off-screen and draw numbers 0-9 on it arranged in a grid.
+// This avoids needing to load an external image file.
+function createMatrixFontTexture() {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const size = 64; // Size of one character cell
+    const cols = 10; // 0-9 digits
+    const rows = 1; 
+    canvas.width = size * cols;
+    canvas.height = size * rows;
+
+    // Fill background with black (transparent for shader)
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${size * 0.8}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (let i = 0; i < cols; i++) {
+        const char = i.toString();
+        // Draw centered in its cell
+        ctx.fillText(char, i * size + size / 2, size / 2);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    // Important for pixelated look: do not smooth the texture
+    texture.minFilter = THREE.NearestFilter;
+    texture.magFilter = THREE.NearestFilter;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+}
+
+const fontTexture = createMatrixFontTexture();
+
+
+// =========================================
+// STEP 2: The Shaders (GPU Logic)
+// =========================================
+
+// The Vertex Shader does very little, just positions the screen plane.
+const vertexShader = `
+    varying vec2 vUv;
+    void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+`;
+
+// The Fragment Shader does the heavy lifting.
+const fragmentShader = `
+    uniform float uTime;
+    uniform vec2 uResolution;
+    uniform sampler2D uFontTex;
+    uniform vec3 uColor;
+    uniform float uCharCount; // How many characters across the screen
+
+    varying vec2 vUv;
+
+    // A simple pseudo-random function
+    float random(vec2 st) {
+        return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+    }
+
+    void main() {
+        // Calculate aspect ratio to keep cells square
+        float aspect = uResolution.x / uResolution.y;
+        vec2 gridUv = vUv * vec2(uCharCount * aspect, uCharCount);
+
+        // Determine which grid cell we are in (e.g., column 5, row 10)
+        vec2 gridCell = floor(gridUv);
+
+        // Get position within that single cell (0.0 to 1.0)
+        vec2 cellUv = fract(gridUv);
+
+        // --- Vertical Movement & Trails ---
+        // Give each column a slightly different speed offset based on its X index
+        float columnOffset = random(vec2(gridCell.x, 0.0));
+        float speed = 1.0 + columnOffset * 2.0; 
+        
+        // Calculate the "scroll" position based on time and speed
+        float scrollY = gridCell.y + uTime * speed * 5.0;
+
+        // The "trail head" position. We take the fraction to make it loop.
+        float trailPos = fract(scrollY / 20.0); // Divide by 20.0 determines trail length
+
+        // Calculate brightness based on distance from the trail head.
+        // Closer to 0.95 means brighter.
+        float brightness = smoothstep(0.0, 0.95, trailPos);
+        // Sharpen the leading edge slightly to make it white hot
+        float leadingEdge = smoothstep(0.95, 0.98, trailPos) * 2.0;
+        brightness += leadingEdge;
+
+        
+        // --- Character Selection ---
+        // Determine which character to show (0-9).
+        // We step the time so characters don't change every frame, but in jerky steps.
+        float charStepTime = floor(uTime * 4.0 + columnOffset * 10.0);
+        float charIndex = floor(random(vec2(gridCell.x, charStepTime)) * 10.0);
+
+        // Map the 0-9 index to UV coordinates on our font texture atlas.
+        // Our atlas is 10 chars wide, 1 row high.
+        float texAtlasU = (charIndex + cellUv.x) / 10.0;
+        float texAtlasV = cellUv.y; // Only 1 row
+        
+        vec4 fontColor = texture2D(uFontTex, vec2(texAtlasU, texAtlasV));
+
+        // --- Final Color Composition ---
+        // Start with the texture shape
+        vec3 finalColor = fontColor.rgb;
+        
+        // Apply the Matrix green color
+        finalColor *= uColor;
+        
+        // Apply the trail brightness fade
+        finalColor *= brightness;
+        
+        // If brightness is excessively high (leading edge), make it whitish green
+        if(brightness > 1.5) {
+             finalColor = mix(uColor, vec3(1.0), 0.5) * fontColor.rgb;
+        }
+        
+        // Fade out the very bottom of the screen slightly
+        finalColor *= smoothstep(0.0, 0.1, vUv.y);
+
+        gl_FragColor = vec4(finalColor, 1.0);
+    }
+`;
+
+
+// =========================================
+// STEP 3: Three.js Setup
+// =========================================
+const scene = new THREE.Scene();
+// Use an orthographic camera for a flat, 2D screen effect without perspective distortion
+const camera = new THREE.OrthographicCamera( -1, 1, 1, -1, 0, 1 );
+const renderer = new THREE.WebGLRenderer({ antialias: false }); // Disable antialias for sharper pixels
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Uniforms passed to the shader
+const uniforms = {
+    uTime: { value: 0 },
+    uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+    uFontTex: { value: fontTexture },
+    uColor: { value: new THREE.Color(0x00ff41) }, // Classic Matrix Green
+    uCharCount: { value: 50.0 } // Density: How many rows of characters high fit on screen
+};
+
+const material = new THREE.ShaderMaterial({
+    vertexShader: vertexShader,
+    fragmentShader: fragmentShader,
+    uniforms: uniforms,
+    transparent: true,
+    depthTest: false // Not needed for a 2D screen effect
+});
+
+// A plane that fills the screen
+const geometry = new THREE.PlaneGeometry(2, 2);
+const plane = new THREE.Mesh(geometry, material);
+scene.add(plane);
+
+
+// =========================================
+// STEP 4: Animation Loop & Handling
+// =========================================
+const clock = new THREE.Clock();
+
+function animate() {
+    requestAnimationFrame(animate);
+    const elapsed = clock.getElapsedTime();
+    // Update time uniform so the shader animates
+    uniforms.uTime.value = elapsed;
+    renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    renderer.setSize(width, height);
+    // Update resolution uniform so aspect ratio stays correct
+    uniforms.uResolution.value.set(width, height);
+});
+
+animate();
+</script>
+</body>
+</html>

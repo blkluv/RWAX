@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Shield, TrendingUp, Coins, ExternalLink, ChevronRight, Info } from 'lucide-react';
-import { SwapModal } from './SwapModal';
 
 interface AssetCardProps {
   asset: {
@@ -119,7 +118,6 @@ function InstantLiquidityBadge({ enabled }: { enabled?: boolean }) {
  * behind user-friendly terminology for better UX.
  */
 export function AssetCard({ asset, onBuy, hasDID }: AssetCardProps) {
-  const [showSwapModal, setShowSwapModal] = useState(false);
   const hasChainInfo = !!asset.chain_info;
   const hasOracle = asset.chain_info?.oracle?.price_set;
   const hasAMM = asset.chain_info?.amm?.exists;
@@ -131,24 +129,13 @@ export function AssetCard({ asset, onBuy, hasDID }: AssetCardProps) {
     : null;
 
   const handleBuyClick = () => {
-    if (!hasDID) {
-      // Trigger the onBuy handler which will prompt for DID verification
-      onBuy(asset);
-      return;
-    }
-    
-    // If AMM exists, show swap modal
-    if (hasAMM) {
-      setShowSwapModal(true);
-    } else {
-      // Fallback to existing behavior
-      onBuy(asset);
-    }
+    // Always show asset detail modal (or call onBuy which will handle it)
+    onBuy(asset);
   };
 
   return (
     <>
-      <div className="bg-zinc-900/60 backdrop-blur-xl border border-zinc-800/50 rounded-2xl overflow-hidden hover:border-emerald-500/50 hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-300 group">
+      <div className="bg-zinc-900/60 backdrop-blur-xl border border-zinc-800/50 rounded-2xl overflow-hidden hover:border-emerald-500/50 hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-300 group relative z-10">
         {/* Header with Glassmorphism */}
         <div className="p-6 border-b border-zinc-800/50 bg-gradient-to-br from-zinc-900/80 to-black/40 backdrop-blur-sm">
           <div className="flex justify-between items-start gap-3">
@@ -204,20 +191,10 @@ export function AssetCard({ asset, onBuy, hasDID }: AssetCardProps) {
         <div className="p-4 bg-black/30 border-t border-zinc-800/50 backdrop-blur-sm">
           <button
             onClick={handleBuyClick}
-            disabled={!hasDID}
-            className="w-full py-4 bg-gradient-to-r from-white to-zinc-100 text-black font-bold text-sm rounded-xl hover:from-emerald-400 hover:to-emerald-300 hover:shadow-lg hover:shadow-emerald-500/25 hover:scale-[1.02] transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            className="w-full py-4 bg-gradient-to-r from-white to-zinc-100 text-black font-bold text-sm rounded-xl hover:from-emerald-400 hover:to-emerald-300 hover:shadow-lg hover:shadow-emerald-500/25 hover:scale-[1.02] transition-all flex justify-center items-center gap-2"
           >
-            {hasAMM ? (
-              <>
-                <span>Swap Yield Rights</span>
-                <ChevronRight className="w-4 h-4" />
-              </>
-            ) : (
-              <>
-                <span>View Asset Details</span>
-                <ExternalLink className="w-4 h-4" />
-              </>
-            )}
+            <span>View Asset</span>
+            <ChevronRight className="w-4 h-4" />
           </button>
           {!hasDID && (
             <p className="text-[10px] text-zinc-500 text-center mt-2">
@@ -237,18 +214,6 @@ export function AssetCard({ asset, onBuy, hasDID }: AssetCardProps) {
         )}
       </div>
 
-      {/* Swap Modal */}
-      {showSwapModal && (
-        <SwapModal
-          asset={asset}
-          isOpen={showSwapModal}
-          onClose={() => setShowSwapModal(false)}
-          onSwap={(amount: string) => {
-            setShowSwapModal(false);
-            onBuy(asset); // Trigger swap transaction
-          }}
-        />
-      )}
     </>
   );
 }
