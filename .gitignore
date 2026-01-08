@@ -57,3 +57,7 @@ test_did.js
 *.md
 !README.md
 !/README.md
+
+# Demo and setup documentation (explicitly ignored)
+DEMO_SETUP.md
+README_TERMINAL_LOGS.md

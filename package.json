@@ -6,9 +6,12 @@
   "scripts": {
     "sync-data": "cp services/oracle/output/rwa_assets.json apps/frontend/src/data/rwa_assets.json && echo '✅ Data synced: oracle → frontend'",
     "oracle:run": "cd services/oracle && python3 clean_data.py",
+    "oracle:mint": "cd services/oracle && python3 mint_assets.py",
+    "backend:events": "cd services/oracle && source venv/bin/activate && python3 event_logger.py",
     "frontend:dev": "cd apps/frontend && yarn dev",
     "frontend:build": "cd apps/frontend && yarn build",
-    "frontend:preview": "cd apps/frontend && yarn preview"
+    "frontend:preview": "cd apps/frontend && yarn preview",
+    "watch:activity": "node apps/frontend/src/utils/terminalWatcher.js"
   },
   "workspaces": [
     "apps/*",
