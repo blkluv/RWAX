@@ -1,39 +1,23 @@
 {
-  "name": "rwax",
+  "name": "rwax-monorepo",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "description": "RWAX - Real World Asset Exchange on XRPL",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "sync-data": "cp services/oracle/output/rwa_assets.json apps/frontend/src/data/rwa_assets.json && echo '✅ Data synced: oracle → frontend'",
+    "oracle:run": "cd services/oracle && python3 clean_data.py",
+    "frontend:dev": "cd apps/frontend && yarn dev",
+    "frontend:build": "cd apps/frontend && yarn build",
+    "frontend:preview": "cd apps/frontend && yarn preview"
   },
-  "dependencies": {
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.562.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "recharts": "^3.6.0",
-    "tailwind-merge": "^3.4.0",
-    "xrpl": "^4.5.0",
-    "xrpl-connect": "^0.4.0"
+  "workspaces": [
+    "apps/*",
+    "services/*"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LingSiewWin/RWAX.git"
   },
-  "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@types/node": "^24.10.1",
-    "@types/react": "^19.2.5",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.1",
-    "autoprefixer": "^10.4.23",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "globals": "^16.5.0",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.18",
-    "typescript": "~5.9.3",
-    "typescript-eslint": "^8.46.4",
-    "vite": "^7.2.4"
-  }
+  "author": "",
+  "license": "ISC"
 }
