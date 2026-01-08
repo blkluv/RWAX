@@ -51,7 +51,9 @@ services/oracle/output/
 apps/frontend/src/data/rwa_assets.json
 
 # Internal documentation
-DID_MINT_FIX.md
 test_did.js
 
-.md
+# Markdown files (except README.md)
+*.md
+!README.md
+!/README.md

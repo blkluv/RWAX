@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { WalletManager } from 'xrpl-connect';
 import { useIdentity } from './hooks/useIdentity';
 import ThreeHero from './components/ThreeHero';
+import { VerificationModal } from './components/VerificationModal';
 import rwaData from './data/rwa_assets.json';
 
 interface AppProps {
@@ -11,8 +12,9 @@ interface AppProps {
 function App({ walletManager }: AppProps) {
   const [account, setAccount] = useState<any>(null);
   const connectorRef = useRef<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { hasDID, isLoading, isMinting, mintDID } = useIdentity(account?.address, walletManager);
+  const { hasDID, isLoading, isMinting, mintDID, dryRunMode, setDryRunMode } = useIdentity(account?.address, walletManager);
 
   useEffect(() => {
     // 1. Connect the Manager to the UI Component
@@ -50,10 +52,10 @@ function App({ walletManager }: AppProps) {
   const handleBuy = async (asset: any) => {
     if (!account) return alert("Please connect wallet first");
 
-    // UX FIX: If no DID, prompt to mint immediately
+    // UX FIX: If no DID, prompt to verify immediately
     if (!hasDID) {
-      const confirm = window.confirm("⚠️ DID Required: You must verify your identity to trade. Mint ID now?");
-      if (confirm) mintDID();
+      const confirm = window.confirm("⚠️ DID Required: You must verify your identity to trade. Verify now?");
+      if (confirm) setIsModalOpen(true);
       return;
     }
 
@@ -61,6 +63,29 @@ function App({ walletManager }: AppProps) {
     if (asset.chain_info) {
       window.open(`https://testnet.xrpscan.com/account/${asset.chain_info.issuer}`, '_blank');
     }
+  };
+
+  const handleVerifyClick = () => {
+    if (!account) {
+      alert("Please connect your wallet first");
+      return;
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleOCRSuccess = async (name: string) => {
+    setIsModalOpen(false);
+    // Pass the verified name to mintDID
+    await mintDID(name);
+  };
+
+  // Fallback: Allow direct minting without OCR (for testing/debugging)
+  const handleDirectMint = async () => {
+    if (!account) {
+      alert("Please connect your wallet first");
+      return;
+    }
+    await mintDID();
   };
 
   return (
@@ -78,13 +103,39 @@ function App({ walletManager }: AppProps) {
           {account && (
             <>
               {!hasDID ? (
-                <button
-                  onClick={mintDID}
-                  disabled={isMinting}
-                  className="bg-emerald-500 hover:bg-emerald-400 text-black px-4 py-2 rounded-lg font-bold text-xs animate-pulse transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isMinting ? "VERIFYING..." : "🛡️ VERIFY IDENTITY (MINT DID)"}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleVerifyClick}
+                    disabled={isMinting}
+                    className="bg-emerald-500 hover:bg-emerald-400 text-black px-4 py-2 rounded-lg font-bold text-xs animate-pulse transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isMinting ? "VERIFYING..." : "🛡️ VERIFY IDENTITY (KYC)"}
+                  </button>
+                  {/* Debug: Direct mint button (remove in production) */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <>
+                      <button
+                        onClick={handleDirectMint}
+                        disabled={isMinting}
+                        className="bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-2 rounded-lg font-bold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Skip OCR and mint directly (dev only)"
+                      >
+                        ⚡ Direct
+                      </button>
+                      <button
+                        onClick={() => setDryRunMode(!dryRunMode)}
+                        className={`px-3 py-2 rounded-lg font-bold text-xs transition-all ${
+                          dryRunMode 
+                            ? 'bg-yellow-600 hover:bg-yellow-500 text-white' 
+                            : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+                        }`}
+                        title="Toggle dry run mode (no XRP spent)"
+                      >
+                        {dryRunMode ? '🔍 Dry Run ON' : '🔍 Dry Run OFF'}
+                      </button>
+                    </>
+                  )}
+                </div>
               ) : (
                 <span className="bg-emerald-900/50 border border-emerald-500 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-2">
                   ✅ Verified Investor
@@ -167,6 +218,13 @@ function App({ walletManager }: AppProps) {
         <p>Contains information from the Private Residential Property dataset accessed from URA API.</p>
         <p className="mt-2">RWAX Protocol © 2026</p>
       </footer>
+
+      {/* Verification Modal */}
+      <VerificationModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onVerified={handleOCRSuccess} 
+      />
     </div>
   );
 }
