@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Client } from 'xrpl';
 import { WalletManager } from 'xrpl-connect';
 import type { ParsedDocumentData } from '../utils/documentParser';
+import { Logger, logAction } from '../utils/logger';
 
 export function useIdentity(walletAddress: string | undefined, walletManager: WalletManager) {
   const [hasDID, setHasDID] = useState<boolean>(false);
@@ -45,8 +46,17 @@ export function useIdentity(walletAddress: string | undefined, walletManager: Wa
   }, [checkDID]);
 
   // 2. Mint DID Function (The Missing Feature)
+  // [XLS-40 Implementation] DID Minting
+  // Creates a Decentralized Identifier on XRPL for identity verification
   const mintDID = async (parsedData?: ParsedDocumentData, didPayload?: string) => {
     if (!walletAddress) return;
+    
+    logAction("DID Minting Initiated", {
+      hasDocumentData: !!parsedData,
+      hasPayload: !!didPayload,
+      account: walletAddress
+    });
+    
     setIsMinting(true);
 
     let client: Client | null = null;
@@ -64,9 +74,10 @@ export function useIdentity(walletAddress: string | undefined, walletManager: Wa
       };
 
       // Connect to XRPL Testnet
+      Logger.info("Connecting to XRPL Testnet...");
       client = new Client("wss://s.altnet.rippletest.net:51233");
       await client.connect();
-      console.log("✅ Connected to XRPL Testnet");
+      Logger.success("Connected to XRPL Testnet");
 
       // Use structured DID payload if provided, otherwise use default
       let dataPayload: string;
@@ -109,8 +120,11 @@ export function useIdentity(walletAddress: string | undefined, walletManager: Wa
         DIDDocument: toHex(`did:xrpl:1:testnet:${walletAddress}`)
       };
 
-      console.log("📝 Preparing DIDSet Transaction...");
-      console.log("Account:", walletAddress);
+      Logger.transaction("DIDSet", {
+        account: walletAddress,
+        hasDocumentData: !!parsedData,
+        payloadSize: didPayload?.length || 0
+      });
       
       // Decode for logging purposes (browser-compatible hex decode)
       const hexToBytes = (hex: string): Uint8Array => {
@@ -148,19 +162,20 @@ export function useIdentity(walletAddress: string | undefined, walletManager: Wa
       // Calculate transaction fee for user info
       const feeInXRP = prepared.Fee ? (parseInt(prepared.Fee) / 1000000).toFixed(6) : "~0.00001";
       
-      console.log("═══════════════════════════════════════");
-      console.log("📋 TRANSACTION SUMMARY");
-      console.log("═══════════════════════════════════════");
-      console.log("Type: DIDSet (Create Decentralized Identifier)");
-      console.log("Network: XRPL Testnet");
-      console.log(`Account: ${walletAddress}`);
-      console.log(`Fee: ${feeInXRP} XRP (approximately $0.000001 USD)`);
-      console.log("═══════════════════════════════════════");
+      Logger.transaction("DIDSet - Transaction Summary", {
+        type: "Create Decentralized Identifier",
+        network: "XRPL Testnet",
+        account: walletAddress,
+        fee: `${feeInXRP} XRP`,
+        note: "XLS-40 Implementation"
+      });
       
       // DRY RUN MODE: Just show the transaction without submitting
       if (dryRunMode) {
-        console.log("🔍 DRY RUN MODE: Transaction prepared but NOT submitted");
-        console.log("Transaction would be:", JSON.stringify(prepared, null, 2));
+        Logger.info("DRY RUN MODE: Transaction prepared but NOT submitted", {
+          fee: `${feeInXRP} XRP`,
+          transaction: prepared
+        });
         alert(`🔍 DRY RUN MODE\n\nTransaction prepared successfully!\n\nFee: ${feeInXRP} XRP\n\nTo actually submit, disable dry run mode.`);
         setIsMinting(false);
         if (client) {
@@ -170,24 +185,32 @@ export function useIdentity(walletAddress: string | undefined, walletManager: Wa
         return;
       }
 
-      // Sign & Submit via walletManager.signAndSubmit() (correct method name)
+      // [XLS-40 Implementation] Sign & Submit via walletManager.signAndSubmit()
       // This will prompt the user to approve the transaction in their wallet
-      console.log("🔐 Requesting wallet signature...");
-      console.log("⚠️ You will see a wallet popup - please approve the transaction");
-      console.log(`💰 This transaction will cost: ${feeInXRP} XRP`);
+      Logger.wallet("Requesting wallet signature...", {
+        account: walletAddress,
+        fee: `${feeInXRP} XRP`,
+        note: "Please approve transaction in wallet popup"
+      });
       
       // Use signAndSubmit method (correct API from xrpl-connect)
       // First parameter: transaction object
       // Second parameter: submit to ledger (true = submit, false = sign only)
       const result = await walletManager.signAndSubmit(prepared, true);
-      console.log("✅ DID Transaction Result:", result);
+      
+      Logger.didMint("DID Transaction Submitted Successfully", {
+        hash: result?.hash,
+        account: walletAddress
+      });
       
       if (!result || !result.hash) {
         throw new Error("Transaction was signed but no hash returned. It may have been rejected or failed to submit.");
       }
       
-      console.log("🎉 Transaction Hash:", result.hash);
-      console.log("🔗 View on XRPScan:", `https://testnet.xrpscan.com/tx/${result.hash}`);
+      Logger.info("Transaction Details", {
+        hash: result.hash,
+        xrpscan: `https://testnet.xrpscan.com/tx/${result.hash}`
+      });
 
       // Disconnect client after signing
       if (client) {

@@ -3,6 +3,7 @@ import Tesseract from 'tesseract.js';
 import * as pdfjsLib from 'pdfjs-dist';
 import { X, Upload, Scan, CheckCircle, AlertCircle, FileText } from 'lucide-react';
 import { parseDocumentText, createDIDPayload, type ParsedDocumentData } from '../utils/documentParser';
+import { Logger, logAction } from '../utils/logger';
 
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -50,14 +51,14 @@ export function VerificationModal({ isOpen, onClose, onVerified, alreadyVerified
    * Extract text from PDF using pdfjs
    */
   const extractTextFromPDF = async (file: File): Promise<string> => {
-    console.log('📄 Extracting text from PDF...');
+    Logger.info("Extracting text from PDF", { fileName: file.name });
     setProgress('Reading PDF document...');
     
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     
     let fullText = '';
-    console.log(`  Total pages: ${pdf.numPages}`);
+    Logger.info(`PDF has ${pdf.numPages} pages`, { totalPages: pdf.numPages });
     
     for (let i = 1; i <= pdf.numPages; i++) {
       setProgress(`Processing page ${i} of ${pdf.numPages}...`);
@@ -72,10 +73,12 @@ export function VerificationModal({ isOpen, onClose, onVerified, alreadyVerified
         })
         .join(' ');
       fullText += pageText + '\n';
-      console.log(`  Page ${i} extracted (${pageText.length} chars)`);
     }
     
-    console.log(`✅ PDF text extracted: ${fullText.length} total characters`);
+    Logger.success("PDF text extraction complete", {
+      totalCharacters: fullText.length,
+      pages: pdf.numPages
+    });
     return fullText;
   };
 
@@ -83,132 +86,142 @@ export function VerificationModal({ isOpen, onClose, onVerified, alreadyVerified
    * Extract text from image using Tesseract OCR
    */
   const extractTextFromImage = async (imageUrl: string): Promise<string> => {
-    console.log('🖼️  Extracting text from image using OCR...');
+    Logger.ocrScan("Starting OCR extraction", { method: "Tesseract.js" });
     setProgress('Running AI OCR on image...');
     
     const result = await Tesseract.recognize(imageUrl, 'eng', {
       logger: (m) => {
         if (m.status === 'recognizing text') {
           setProgress(`OCR: ${Math.round(m.progress * 100)}%`);
-          console.log(`  OCR Progress: ${Math.round(m.progress * 100)}%`);
+          // Log progress at key milestones
+          if (m.progress === 0 || m.progress >= 0.5 || m.progress === 1) {
+            Logger.info(`OCR Progress: ${Math.round(m.progress * 100)}%`);
+          }
         }
       }
     });
     
-    console.log(`✅ OCR completed: ${result.data.text.length} characters extracted`);
+    Logger.success("OCR completed", {
+      charactersExtracted: result.data.text.length,
+      confidence: result.data.confidence ? `${Math.round(result.data.confidence)}%` : "N/A"
+    });
     return result.data.text;
   };
 
   const runVerification = async () => {
     if (!file) return;
     
+    logAction("Document Verification Started", {
+      fileName: file.name,
+      fileType: file.type,
+      fileSize: `${(file.size / 1024).toFixed(2)} KB`
+    });
+    
     setStatus('scanning');
     setProgress('Starting document verification...');
     
     try {
-      console.log('═══════════════════════════════════════');
-      console.log('🔍 DOCUMENT VERIFICATION PIPELINE');
-      console.log('═══════════════════════════════════════');
-      console.log(`File: ${file.name}`);
-      console.log(`Type: ${file.type}`);
-      console.log(`Size: ${(file.size / 1024).toFixed(2)} KB`);
-      console.log('───────────────────────────────────────');
+      Logger.action("Document Verification Pipeline", {
+        file: file.name,
+        type: file.type,
+        size: `${(file.size / 1024).toFixed(2)} KB`
+      });
       
       let extractedText = '';
       
       // Step 1: Extract text based on file type
       if (file.type === 'application/pdf') {
         setProgress('Extracting text from PDF...');
+        Logger.info("Extracting text from PDF", { fileName: file.name });
         extractedText = await extractTextFromPDF(file);
       } else if (file.type.startsWith('image/')) {
         setProgress('Extracting text from image...');
+        Logger.info("Extracting text from image using OCR", { fileName: file.name });
         const imageUrl = previewUrl || URL.createObjectURL(file);
         extractedText = await extractTextFromImage(imageUrl);
       } else {
+        Logger.error("Unsupported file type", { fileType: file.type });
         throw new Error('Unsupported file type. Please upload PDF or image (JPG, PNG)');
       }
       
-        // Step 2: Parse structured data
-        setStatus('parsing');
-        setProgress('Parsing and validating document data...');
-        console.log('───────────────────────────────────────');
-        console.log('🔍 PARSING DOCUMENT CONTENT...');
-        console.log('Looking for:');
-        console.log('  • Singapore NRIC (S/T/F/G + 7 digits + letter + digit)');
-        console.log('  • Passport numbers (alphanumeric, 8-9 chars)');
-        console.log('  • Full names (patterns like "Name:", "Full Name:")');
-        console.log('  • URA Property IDs (URA- followed by 6-8 digits)');
-        console.log('  • Property addresses (Singapore postal codes: 6 digits)');
-        console.log('  • Accreditation indicators (keywords like "Accredited", "SGD 2,000,000")');
-        console.log('  • IRAS tax references ("IRAS", "Notice of Assessment")');
-        console.log('───────────────────────────────────────');
-        const parsed = parseDocumentText(extractedText);
-        setParsedData(parsed);
-        
-        // Log what was found
-        console.log('═══════════════════════════════════════');
-        console.log('📊 EXTRACTION SUMMARY:');
-        console.log('═══════════════════════════════════════');
-        if (parsed.extractedFields.name) {
-          console.log(`✅ Name found: "${parsed.extractedFields.name}"`);
-        } else {
-          console.log('❌ Name: NOT FOUND (look for "Name:" or "Full Name:" in document)');
-        }
-        
-        if (parsed.extractedFields.nric) {
-          console.log(`✅ NRIC found: "${parsed.extractedFields.nric}" (Singapore ID)`);
-        } else if (parsed.extractedFields.passport) {
-          console.log(`✅ Passport found: "${parsed.extractedFields.passport}"`);
-        } else {
-          console.log('❌ ID Number: NOT FOUND (look for NRIC format: S1234567A or passport number)');
-        }
-        
-        if (parsed.extractedFields.propertyId) {
-          console.log(`✅ Property ID found: "${parsed.extractedFields.propertyId}"`);
-        } else {
-          console.log('❌ Property ID: NOT FOUND (look for "URA-" followed by numbers)');
-        }
-        
-        if (parsed.extractedFields.propertyAddress) {
-          console.log(`✅ Property Address found: "${parsed.extractedFields.propertyAddress.substring(0, 50)}..."`);
-        } else {
-          console.log('❌ Property Address: NOT FOUND (look for Singapore postal codes: 6 digits)');
-        }
-        
-        if (parsed.extractedFields.accreditationStatus) {
-          console.log(`✅ Accreditation Status: VERIFIED (found accreditation indicators)`);
-        } else {
-          console.log('❌ Accreditation: NOT DETECTED (look for "Accredited" or "SGD 2,000,000" keywords)');
-        }
-        
-        if (parsed.extractedFields.taxReference) {
-          console.log(`✅ Tax Reference found: "${parsed.extractedFields.taxReference}"`);
-        }
-        
-        console.log(`📝 Document Hash: ${parsed.hash}`);
-        console.log(`📄 Document Type: ${parsed.documentType}`);
-        console.log(`✓ Valid: ${parsed.isValid}`);
-        console.log('═══════════════════════════════════════');
+      Logger.success("Text extraction complete", {
+        textLength: extractedText.length,
+        characters: extractedText.length.toLocaleString()
+      });
+      
+      // Step 2: Parse structured data
+      setStatus('parsing');
+      setProgress('Parsing and validating document data...');
+      
+      Logger.action("Parsing Document Content", {
+        patterns: [
+          "Singapore NRIC",
+          "Passport numbers",
+          "Full names",
+          "URA Property IDs",
+          "Property addresses",
+          "Accreditation indicators",
+          "IRAS tax references"
+        ]
+      });
+      
+      const parsed = parseDocumentText(extractedText);
+      setParsedData(parsed);
+      
+      // Log what was found with clear formatting
+      const extractionSummary: any = {
+        documentType: parsed.documentType,
+        isValid: parsed.isValid,
+        hash: parsed.hash.substring(0, 16) + "..."
+      };
+      
+      if (parsed.extractedFields.name) {
+        extractionSummary.name = parsed.extractedFields.name;
+      }
+      if (parsed.extractedFields.nric) {
+        extractionSummary.nric = parsed.extractedFields.nric;
+      } else if (parsed.extractedFields.passport) {
+        extractionSummary.passport = parsed.extractedFields.passport;
+      }
+      if (parsed.extractedFields.propertyId) {
+        extractionSummary.propertyId = parsed.extractedFields.propertyId;
+      }
+      if (parsed.extractedFields.accreditationStatus) {
+        extractionSummary.accredited = true;
+      }
+      
+      Logger.documentParse("Document parsing complete", extractionSummary);
       
       // Step 3: Create DID payload
       setProgress('Generating DID payload...');
-      console.log('───────────────────────────────────────');
+      Logger.info("Creating DID Payload", {
+        documentType: parsed.documentType,
+        payloadLimit: "256 bytes (XLS-40)"
+      });
+      
       const payload = createDIDPayload(parsed);
       setDidPayload(payload);
+      
+      Logger.success("DID Payload Created", {
+        payload,
+        size: `${new TextEncoder().encode(payload).length} bytes`,
+        note: "Ready for XLS-40 DIDSet transaction"
+      });
       
       // Step 4: Show success
       setStatus('success');
       setProgress('Document verified successfully!');
       
-      console.log('═══════════════════════════════════════');
-      console.log('✅ VERIFICATION COMPLETE');
-      console.log('═══════════════════════════════════════');
-      console.log('Ready to mint DID with payload:', payload);
-      console.log('═══════════════════════════════════════');
+      Logger.success("Verification Complete", {
+        readyForMinting: !alreadyVerified,
+        payload: payload.substring(0, 50) + "..."
+      });
       
       // If already verified, just show results without minting
       if (alreadyVerified) {
-        console.log('ℹ️  Already verified - showing results only (no DID minting)');
+        Logger.info("Already verified - showing results only", {
+          note: "No DID minting needed (test mode)"
+        });
         setProgress('Document parsed successfully! (Already verified, no transaction needed)');
         // Don't call onVerified callback if already verified
         return;
@@ -221,7 +234,10 @@ export function VerificationModal({ isOpen, onClose, onVerified, alreadyVerified
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Verification failed. Please try again.';
-      console.error('❌ Verification failed:', err);
+      Logger.error("Document Verification Failed", {
+        error: errorMessage,
+        details: err
+      });
       setStatus('error');
       setProgress(errorMessage);
     }
