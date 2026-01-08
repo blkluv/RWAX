@@ -32,3 +32,8 @@ requirements.txt
 
 #python
 clean_data.py
+clean_data.
+
+# Data files
+*.xlsx
+*.xls
