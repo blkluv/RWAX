@@ -3,6 +3,7 @@ import { WalletManager } from 'xrpl-connect';
 import { useIdentity } from './hooks/useIdentity';
 import ThreeHero from './components/ThreeHero';
 import { VerificationModal } from './components/VerificationModal';
+import { type ParsedDocumentData } from './utils/documentParser';
 import rwaData from './data/rwa_assets.json';
 
 interface AppProps {
@@ -73,10 +74,10 @@ function App({ walletManager }: AppProps) {
     setIsModalOpen(true);
   };
 
-  const handleOCRSuccess = async (name: string) => {
+  const handleOCRSuccess = async (parsedData: ParsedDocumentData, didPayload: string) => {
     setIsModalOpen(false);
-    // Pass the verified name to mintDID
-    await mintDID(name);
+    // Pass the parsed document data and DID payload to mintDID
+    await mintDID(parsedData, didPayload);
   };
 
   // Fallback: Allow direct minting without OCR (for testing/debugging)
@@ -85,7 +86,8 @@ function App({ walletManager }: AppProps) {
       alert("Please connect your wallet first");
       return;
     }
-    await mintDID();
+    // Direct mint without document parsing (uses default payload)
+    await mintDID(undefined, undefined);
   };
 
   return (
@@ -102,45 +104,49 @@ function App({ walletManager }: AppProps) {
         <div className="flex items-center gap-4">
           {account && (
             <>
-              {!hasDID ? (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleVerifyClick}
-                    disabled={isMinting}
-                    className="bg-emerald-500 hover:bg-emerald-400 text-black px-4 py-2 rounded-lg font-bold text-xs animate-pulse transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isMinting ? "VERIFYING..." : "🛡️ VERIFY IDENTITY (KYC)"}
-                  </button>
-                  {/* Debug: Direct mint button (remove in production) */}
-                  {process.env.NODE_ENV === 'development' && (
-                    <>
-                      <button
-                        onClick={handleDirectMint}
-                        disabled={isMinting}
-                        className="bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-2 rounded-lg font-bold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Skip OCR and mint directly (dev only)"
-                      >
-                        ⚡ Direct
-                      </button>
-                      <button
-                        onClick={() => setDryRunMode(!dryRunMode)}
-                        className={`px-3 py-2 rounded-lg font-bold text-xs transition-all ${
-                          dryRunMode 
-                            ? 'bg-yellow-600 hover:bg-yellow-500 text-white' 
-                            : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
-                        }`}
-                        title="Toggle dry run mode (no XRP spent)"
-                      >
-                        {dryRunMode ? '🔍 Dry Run ON' : '🔍 Dry Run OFF'}
-                      </button>
-                    </>
-                  )}
-                </div>
-              ) : (
+              {hasDID && (
                 <span className="bg-emerald-900/50 border border-emerald-500 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-2">
                   ✅ Verified Investor
                 </span>
               )}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleVerifyClick}
+                  disabled={isMinting}
+                  className={`px-4 py-2 rounded-lg font-bold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    hasDID 
+                      ? 'bg-zinc-700 hover:bg-zinc-600 text-white border border-zinc-600' 
+                      : 'bg-emerald-500 hover:bg-emerald-400 text-black animate-pulse'
+                  }`}
+                  title={hasDID ? "Test OCR/Document Parsing (Already Verified)" : "Verify Identity with KYC"}
+                >
+                  {isMinting ? "VERIFYING..." : hasDID ? "🧪 TEST OCR" : "🛡️ VERIFY IDENTITY (KYC)"}
+                </button>
+                {/* Debug: Direct mint button (remove in production) */}
+                {process.env.NODE_ENV === 'development' && (
+                  <>
+                    <button
+                      onClick={handleDirectMint}
+                      disabled={isMinting}
+                      className="bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-2 rounded-lg font-bold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Skip OCR and mint directly (dev only)"
+                    >
+                      ⚡ Direct
+                    </button>
+                    <button
+                      onClick={() => setDryRunMode(!dryRunMode)}
+                      className={`px-3 py-2 rounded-lg font-bold text-xs transition-all ${
+                        dryRunMode 
+                          ? 'bg-yellow-600 hover:bg-yellow-500 text-white' 
+                          : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+                      }`}
+                      title="Toggle dry run mode (no XRP spent)"
+                    >
+                      {dryRunMode ? '🔍 Dry Run ON' : '🔍 Dry Run OFF'}
+                    </button>
+                  </>
+                )}
+              </div>
             </>
           )}
 
@@ -223,7 +229,8 @@ function App({ walletManager }: AppProps) {
       <VerificationModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-        onVerified={handleOCRSuccess} 
+        onVerified={handleOCRSuccess}
+        alreadyVerified={hasDID}
       />
     </div>
   );

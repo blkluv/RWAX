@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Client } from 'xrpl';
 import { WalletManager } from 'xrpl-connect';
+import type { ParsedDocumentData } from '../utils/documentParser';
 
 export function useIdentity(walletAddress: string | undefined, walletManager: WalletManager) {
   const [hasDID, setHasDID] = useState<boolean>(false);
@@ -44,7 +45,7 @@ export function useIdentity(walletAddress: string | undefined, walletManager: Wa
   }, [checkDID]);
 
   // 2. Mint DID Function (The Missing Feature)
-  const mintDID = async (verifiedName?: string) => {
+  const mintDID = async (parsedData?: ParsedDocumentData, didPayload?: string) => {
     if (!walletAddress) return;
     setIsMinting(true);
 
@@ -67,27 +68,62 @@ export function useIdentity(walletAddress: string | undefined, walletManager: Wa
       await client.connect();
       console.log("✅ Connected to XRPL Testnet");
 
+      // Use structured DID payload if provided, otherwise use default
+      let dataPayload: string;
+      let uriPayload: string;
+
+      if (didPayload && parsedData) {
+        // Use the parsed document data and generated DID payload
+        console.log("═══════════════════════════════════════");
+        console.log("📝 USING STRUCTURED DID PAYLOAD");
+        console.log("═══════════════════════════════════════");
+        console.log("Document Type:", parsedData.documentType);
+        console.log("Valid:", parsedData.isValid);
+        console.log("Hash:", parsedData.hash);
+        console.log("Payload JSON:", didPayload);
+        console.log("═══════════════════════════════════════");
+        
+        // Use the compact JSON payload as Data field (hex-encoded)
+        dataPayload = toHex(didPayload);
+        // URI can reference the document hash or verification endpoint
+        uriPayload = toHex(`https://rwax.sg/v/${parsedData.hash.substring(0, 16)}`);
+      } else {
+        // Fallback for direct minting (dev mode)
+        console.log("⚠️  Using default DID payload (no document data)");
+        dataPayload = toHex("Verified RWA Investor - KYC Level 1");
+        uriPayload = toHex("https://rwax.sg/kyc/investor");
+      }
+
       // Construct the XLS-40 DIDSet Transaction
       // CRITICAL: At least ONE of URI, Data, or DIDDocument must be provided
       // All fields must be hex-encoded strings
       const txBase: any = {
         TransactionType: "DIDSet",
         Account: walletAddress,
-        // URI: Primary identifier (can be hex-encoded string)
-        // Use the OCR-verified name or default to verified status
-        URI: verifiedName ? toHex(`kyc:${verifiedName}`) : toHex("https://rwax.sg/kyc/investor"),
-        // Data: Additional attestation data (optional, hex-encoded)
-        Data: toHex(verifiedName ? `Verified: ${verifiedName}` : "Verified RWA Investor - KYC Level 1"),
-        // DIDDocument: Can contain the actual DID identifier (optional, hex-encoded)
+        // URI: Reference to verification endpoint or document hash
+        URI: uriPayload,
+        // Data: Compact JSON payload with verified information (hex-encoded)
+        Data: dataPayload,
+        // DIDDocument: Standard DID identifier (hex-encoded)
         // Format: did:xrpl:1:{network}:{account}
         DIDDocument: toHex(`did:xrpl:1:testnet:${walletAddress}`)
       };
 
       console.log("📝 Preparing DIDSet Transaction...");
       console.log("Account:", walletAddress);
+      
+      // Decode for logging purposes (browser-compatible hex decode)
+      const hexToBytes = (hex: string): Uint8Array => {
+        const bytes = new Uint8Array(hex.length / 2);
+        for (let i = 0; i < hex.length; i += 2) {
+          bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+        }
+        return bytes;
+      };
+      const decoder = new TextDecoder();
       console.log("Transaction (decoded):", {
-        URI: verifiedName ? `kyc:${verifiedName}` : "https://rwax.sg/kyc/investor",
-        Data: verifiedName ? `Verified: ${verifiedName}` : "Verified RWA Investor - KYC Level 1",
+        URI: decoder.decode(hexToBytes(uriPayload)),
+        Data: decoder.decode(hexToBytes(dataPayload)),
         DIDDocument: `did:xrpl:1:testnet:${walletAddress}`
       });
 
