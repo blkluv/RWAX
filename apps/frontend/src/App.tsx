@@ -1,10 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { WalletManager } from 'xrpl-connect';
-import { Shield } from 'lucide-react';
 import { useIdentity } from './hooks/useIdentity';
 import ThreeHero from './components/ThreeHero';
 import { VerificationModal } from './components/VerificationModal';
 import { AssetCard } from './components/AssetCard';
+import { AssetDetailModal } from './components/AssetDetailModal';
+import { Toast } from './components/Toast';
+// import { BackgroundRipple } from './components/BackgroundRipple'; // Disabled - static design
+import { WhiteHeroSection } from './components/WhiteHeroSection';
+import { HeroSection } from './components/HeroSection';
+import { MarketDepthSection } from './components/MarketDepthSection';
+import { ImpactHeroSection } from './components/ImpactHeroSection';
+import { RWAXHeader } from './components/RWAXHeader';
 import { type ParsedDocumentData } from './utils/documentParser';
 import { Logger, logAction } from './utils/logger';
 import rwaData from './data/rwa_assets.json';
@@ -17,6 +24,13 @@ function App({ walletManager }: AppProps) {
   const [account, setAccount] = useState<any>(null);
   const connectorRef = useRef<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<any>(null);
+  const [showAssetDetailModal, setShowAssetDetailModal] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info'; isVisible: boolean }>({
+    message: '',
+    type: 'success',
+    isVisible: false
+  });
 
   const { hasDID, isLoading, isMinting, mintDID, dryRunMode, setDryRunMode } = useIdentity(account?.address, walletManager);
 
@@ -70,57 +84,215 @@ function App({ walletManager }: AppProps) {
     };
   }, [walletManager]);
 
+
   const handleBuy = async (asset: any) => {
+    // Show asset detail modal
+    setSelectedAsset(asset);
+    setShowAssetDetailModal(true);
+    
+    Logger.info("Asset Detail View Opened", {
+      asset: asset.identity.project,
+      hasAMM: asset.chain_info?.amm?.exists
+    });
+  };
+
+  interface SwapParams {
+    fromAsset: 'XRP' | 'PT' | 'YT' | 'RLUSD';
+    toAsset: 'XRP' | 'PT' | 'YT' | 'RLUSD';
+    fromAmount: string;
+    toAssetInfo?: {
+      currency: string;
+      issuer: string;
+      ticker: string;
+    };
+    deliverMin?: string; // Minimum tokens to receive (slippage protection)
+  }
+
+  const handleSwap = async (asset: any, swapParams: SwapParams) => {
     if (!account) {
-      Logger.wallet("Wallet connection required", { action: "buy_asset" });
-      return alert("Please connect wallet first");
+      Logger.wallet("Wallet connection required", { action: "swap_asset" });
+      setToast({
+        message: "Please connect wallet first",
+        type: 'error',
+        isVisible: true
+      });
+      return;
     }
 
     // Log action
-    logAction("Buy Asset Clicked", {
+    logAction("Swap Yield Rights", {
       asset: asset.identity.project,
       ticker: asset.financials.tokens.yt_ticker,
+      from: swapParams.fromAsset,
+      to: swapParams.toAsset,
+      amount: swapParams.fromAmount,
       hasDID,
-      hasAMM: asset.chain_info?.amm?.exists
+      hasAMM: asset.chain_info?.amm?.exists || asset.chain_info?.amm?.yt?.exists
     });
 
     // UX FIX: If no DID, prompt to verify immediately
     if (!hasDID) {
       Logger.info("DID Required - Prompting for verification", { asset: asset.identity.project });
-      const confirm = window.confirm("⚠️ DID Required: You must verify your identity to trade. Verify now?");
-      if (confirm) setIsModalOpen(true);
+      setShowAssetDetailModal(false);
+      setToast({
+        message: "Identity verification required. Please verify your DID first.",
+        type: 'error',
+        isVisible: true
+      });
+      setTimeout(() => setIsModalOpen(true), 500);
       return;
     }
 
-    // [XLS-30 Implementation] If AMM exists, trigger swap transaction
-    if (asset.chain_info?.amm?.exists) {
+    // [XLS-30 Implementation] Asset-to-Asset Swap transaction
+    const { fromAsset, toAsset, fromAmount, toAssetInfo, deliverMin } = swapParams;
+    
+    if (asset.chain_info?.amm?.exists || asset.chain_info?.amm?.yt?.exists || asset.chain_info?.amm?.pt?.exists) {
       try {
-        Logger.amm("Initiating AMM Swap", {
-          asset: asset.chain_info.ticker,
+        Logger.amm("Initiating Asset-to-Asset Swap", {
+          from: fromAsset,
+          to: toAsset,
+          asset: asset.chain_info.ticker || asset.chain_info?.tokens?.yt?.ticker,
           project: asset.identity.project,
           pool: "Active"
         });
         
-        // Prepare Payment transaction (XRP -> Token)
-        // XRPL automatically routes through AMM if it's the best path
+        // Determine destination asset info
+        let destinationAmount: any;
+        let sendMax: any;
+        
+        // Load RLUSD info if needed
+        let rlusdInfo: any = null;
+        if (fromAsset === 'RLUSD' || toAsset === 'RLUSD') {
+          try {
+            const rlusdData = await fetch('/output/rlusd_info.json');
+            if (rlusdData.ok) {
+              rlusdInfo = await rlusdData.json();
+            }
+          } catch (e) {
+            console.warn('RLUSD info not found:', e);
+          }
+        }
+        
+        if (toAsset === 'XRP') {
+          // Token → XRP
+          destinationAmount = fromAmount; // XRP amount as string
+          const sourceTokenInfo = fromAsset === 'YT' 
+            ? {
+                currency: asset.chain_info.currency || asset.chain_info.tokens.yt.currency,
+                issuer: asset.chain_info.issuer,
+                value: fromAmount
+              }
+            : fromAsset === 'PT'
+            ? {
+                currency: asset.chain_info.tokens.pt.currency,
+                issuer: asset.chain_info.issuer,
+                value: fromAmount
+              }
+            : {
+                currency: rlusdInfo?.currency || '',
+                issuer: rlusdInfo?.issuer || '',
+                value: fromAmount
+              };
+          sendMax = sourceTokenInfo;
+        } else if (fromAsset === 'XRP') {
+          // XRP → Token
+          const estimatedTokens = (parseFloat(fromAmount) * 100).toFixed(2); // Demo: 1 XRP = 100 tokens
+          destinationAmount = toAssetInfo || {
+            currency: asset.chain_info.currency || asset.chain_info.tokens.yt.currency,
+            issuer: asset.chain_info.issuer,
+            value: estimatedTokens
+          };
+          sendMax = fromAmount; // XRP as string
+        } else {
+          // Token → Token (e.g., PT → YT or PT → RLUSD)
+          const estimatedTokens = (parseFloat(fromAmount) * 1.0).toFixed(2); // 1:1 for demo
+          
+          destinationAmount = toAssetInfo || {
+            currency: asset.chain_info.currency || asset.chain_info.tokens.yt.currency,
+            issuer: asset.chain_info.issuer,
+            value: estimatedTokens
+          };
+          
+          // Determine source token
+          const fromTokenInfo = fromAsset === 'YT'
+            ? {
+                currency: asset.chain_info.currency || asset.chain_info.tokens.yt.currency,
+                issuer: asset.chain_info.issuer,
+                value: fromAmount
+              }
+            : fromAsset === 'PT'
+            ? {
+                currency: asset.chain_info.tokens.pt.currency,
+                issuer: asset.chain_info.issuer,
+                value: fromAmount
+              }
+            : {
+                currency: rlusdInfo?.currency || '',
+                issuer: rlusdInfo?.issuer || '',
+                value: fromAmount
+              };
+          sendMax = fromTokenInfo;
+        }
+        
+        // Build Payment transaction
         const tx: any = {
           TransactionType: "Payment",
           Account: account.address,
-          Destination: asset.chain_info.issuer,
-          Amount: {
-            currency: asset.chain_info.currency,
-            issuer: asset.chain_info.issuer,
-            value: "1" // Buy 1 token for demo
-          },
-          SendMax: "10" // Spend max 10 XRP
+          Destination: toAssetInfo?.issuer || asset.chain_info.issuer,
+          Amount: destinationAmount,
+          SendMax: sendMax
         };
+        
+        // Add DeliverMin for slippage protection (Token → Token only)
+        if (deliverMin && (fromAsset !== 'XRP' || toAsset !== 'XRP')) {
+          tx.DeliverMin = typeof deliverMin === 'string' 
+            ? deliverMin 
+            : {
+                currency: (toAssetInfo || destinationAmount).currency,
+                issuer: (toAssetInfo || destinationAmount).issuer,
+                value: deliverMin
+              };
+        }
+        
+        // Optional: Add Paths for complex routing (Token → Token through XRP)
+        if (fromAsset !== 'XRP' && toAsset !== 'XRP') {
+          // Token → Token: Route through XRP (e.g., PT → XRP → YT)
+          const fromCurrency = fromAsset === 'YT'
+            ? asset.chain_info.currency || asset.chain_info.tokens.yt.currency
+            : fromAsset === 'PT'
+            ? asset.chain_info.tokens.pt.currency
+            : rlusdInfo?.currency || '';
+          
+          const toCurrency = toAsset === 'YT'
+            ? asset.chain_info.currency || asset.chain_info.tokens.yt.currency
+            : toAsset === 'PT'
+            ? asset.chain_info.tokens.pt.currency
+            : rlusdInfo?.currency || '';
+          
+          if (fromCurrency && toCurrency) {
+            tx.Paths = [
+              [
+                {
+                  currency: fromCurrency,
+                  issuer: asset.chain_info.issuer
+                },
+                { currency: "XRP" },
+                {
+                  currency: toCurrency,
+                  issuer: (toAssetInfo?.issuer || asset.chain_info.issuer)
+                }
+              ]
+            ];
+          }
+        }
 
         Logger.transaction("Payment", {
-          type: "XRP → Token Swap",
+          type: `${fromAsset} → ${toAsset} Swap (XLS-30 AMM)`,
           from: account.address,
-          to: asset.chain_info.issuer,
-          amount: "1 token",
-          maxSpend: "10 XRP"
+          to: toAssetInfo?.issuer || asset.chain_info.issuer,
+          amount: JSON.stringify(destinationAmount),
+          maxSpend: JSON.stringify(sendMax),
+          paths: tx.Paths ? "XRP routed" : "Direct"
         });
 
         // Prepare transaction
@@ -138,18 +310,32 @@ function App({ walletManager }: AppProps) {
         // Sign and submit via wallet
         Logger.wallet("Requesting wallet signature...", {
           account: account.address,
+          amount: `${fromAmount} ${fromAsset}`,
           note: "Please approve in wallet popup"
         });
+        
+        // Use walletManager.signAndSubmit() for transaction
         const result = await walletManager.signAndSubmit(prepared, true);
         
         Logger.success("Swap Transaction Submitted", {
           hash: result?.hash,
-          ticker: asset.chain_info.ticker
+          ticker: asset.chain_info?.ticker || asset.chain_info?.tokens?.yt?.ticker,
+          from: fromAsset,
+          to: toAsset,
+          amount: fromAmount
+        });
+        
+        // Close modals and show toast notification
+        setShowAssetDetailModal(false);
+        setToast({
+          message: "XLS-30 AMM Swap Complete. Received YT-Tokens.",
+          type: 'success',
+          isVisible: true
         });
         
         if (result?.hash) {
           Logger.info("Transaction Hash", { hash: result.hash });
-          alert(`✅ Swap initiated!\n\nTransaction: ${result.hash}\n\nView on XRPScan: https://testnet.xrpscan.com/tx/${result.hash}`);
+          // Toast already shown, no need for alert
         }
       } catch (error: any) {
         Logger.error("Swap Transaction Failed", {
@@ -157,19 +343,21 @@ function App({ walletManager }: AppProps) {
           asset: asset.identity.project,
           details: error
         });
-        alert(`Swap failed: ${error.message || "Unknown error"}\n\nPlease ensure you have XRP in your wallet.`);
+        setToast({
+          message: `Swap failed: ${error.message || "Unknown error"}`,
+          type: 'error',
+          isVisible: true
+        });
       }
       return;
     }
 
     // Fallback: Show asset details if no AMM
-    if (asset.chain_info) {
-      Logger.info("Opening asset details", { 
-        issuer: asset.chain_info.issuer,
-        project: asset.identity.project
-      });
-      window.open(`https://testnet.xrpscan.com/account/${asset.chain_info.issuer}`, '_blank');
-    }
+    setToast({
+      message: "AMM pool not available for this asset",
+      type: 'info',
+      isVisible: true
+    });
   };
 
   const handleVerifyClick = () => {
@@ -222,118 +410,66 @@ function App({ walletManager }: AppProps) {
   };
 
   return (
-    <div className="min-h-screen text-white font-sans selection:bg-emerald-500 selection:text-black">
-      {/* 1. BACKGROUND ANIMATION */}
+    <div className="min-h-screen text-white font-sans selection:bg-emerald-500 selection:text-black bg-black">
+      {/* 0. BACKGROUND RIPPLE EFFECT - DISABLED (static design) */}
+      {/* <BackgroundRipple /> */}
+      
+      {/* 1. BACKGROUND ANIMATION - Only visible on dark sections */}
       <ThreeHero />
 
-      {/* 2. NAVIGATION */}
-      <nav className="fixed top-0 w-full p-6 flex justify-between items-center z-50 bg-black/50 backdrop-blur-md border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold tracking-tighter">RWAX</h1>
-        </div>
+      {/* 2. HEADER - White background, minimalist design */}
+      <RWAXHeader 
+        account={account}
+        hasDID={hasDID}
+        onVerifyClick={handleVerifyClick}
+        walletConnectorRef={connectorRef}
+        isMinting={isMinting}
+        walletManager={walletManager}
+      />
 
-        <div className="flex items-center gap-4">
-          {account && (
-            <>
-              {hasDID && (
-                <span className="bg-emerald-900/50 border border-emerald-500 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-2">
-                  ✅ Verified Investor
-                </span>
-              )}
-              {/* MAS Compliance Indicator - Hidden XLS-39 behind user-friendly text */}
-              <div className="group relative">
-                <span className="bg-gradient-to-r from-yellow-900/50 to-yellow-800/30 border border-yellow-500/30 text-yellow-400 px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-2 cursor-help">
-                  <Shield className="w-3 h-3" />
-                  <span>MAS Regulated</span>
-                </span>
-                <div className="absolute right-0 top-full mt-2 hidden group-hover:block z-50">
-                  <div className="bg-zinc-800/95 backdrop-blur-sm border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-300 whitespace-nowrap shadow-xl">
-                    Compliance enforcement enabled
-                    <div className="text-[10px] text-zinc-500 mt-0.5">XLS-39 Clawback</div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleVerifyClick}
-                  disabled={isMinting}
-                  className={`px-4 py-2 rounded-lg font-bold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                    hasDID 
-                      ? 'bg-zinc-700 hover:bg-zinc-600 text-white border border-zinc-600' 
-                      : 'bg-emerald-500 hover:bg-emerald-400 text-black animate-pulse'
-                  }`}
-                  title={hasDID ? "Test OCR/Document Parsing (Already Verified)" : "Verify Identity with KYC"}
-                >
-                  {isMinting ? "VERIFYING..." : hasDID ? "🧪 TEST OCR" : "🛡️ VERIFY IDENTITY (KYC)"}
-                </button>
-                {/* Debug: Direct mint button (remove in production) */}
-                {process.env.NODE_ENV === 'development' && (
-                  <>
-                    <button
-                      onClick={handleDirectMint}
-                      disabled={isMinting}
-                      className="bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-2 rounded-lg font-bold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Skip OCR and mint directly (dev only)"
-                    >
-                      ⚡ Direct
-                    </button>
-                    <button
-                      onClick={() => setDryRunMode(!dryRunMode)}
-                      className={`px-3 py-2 rounded-lg font-bold text-xs transition-all ${
-                        dryRunMode 
-                          ? 'bg-yellow-600 hover:bg-yellow-500 text-white' 
-                          : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
-                      }`}
-                      title="Toggle dry run mode (no XRP spent)"
-                    >
-                      {dryRunMode ? '🔍 Dry Run ON' : '🔍 Dry Run OFF'}
-                    </button>
-                  </>
-                )}
-              </div>
-            </>
-          )}
+      {/* 3. WHITE HERO SECTION - First section user sees */}
+      <WhiteHeroSection />
 
-          <xrpl-wallet-connector
-            ref={connectorRef}
-            primary-wallet="crossmark"
-            background-color="#000000"
-          ></xrpl-wallet-connector>
-        </div>
-      </nav>
+      {/* 4. DARK STATS SECTION - Scroll down to see */}
+      <HeroSection />
 
-      {/* 3. SCROLL SPACER (This triggers the X split) */}
-      <div className="h-screen flex items-center justify-center pointer-events-none">
-        <div className="text-center animate-pulse">
-          <p className="text-xs tracking-[0.3em] text-gray-500">SCROLL TO UNLOCK YIELD</p>
-          <div className="mt-4 w-px h-16 bg-gradient-to-b from-gray-500 to-transparent mx-auto"></div>
-        </div>
-      </div>
+      {/* 5. MARKET DEPTH SECTION - Yield Heatmap Visualization */}
+      <MarketDepthSection />
 
-      {/* 4. MAIN CONTENT (Appears after scroll) */}
+      {/* 6. IMPACT HERO SECTION - Final CTA with Particle Assembler */}
+      {/* Note: Add backgroundImage prop when image is provided - place image in /public/images/ */}
+      <ImpactHeroSection />
+
+      {/* 7. MAIN CONTENT (Appears after scroll) */}
       <main className="max-w-7xl mx-auto p-6 pb-20 relative z-10">
-        <div className="mb-12 backdrop-blur-md bg-black/30 p-8 rounded-2xl border border-white/10">
-          <h2 className="text-4xl font-bold mb-4">Prime Yield Assets</h2>
-          <p className="text-gray-400 max-w-xl">
-            RWAX separates ownership from yield. Acquire <strong>Yield Rights (YT)</strong> for instant cash flow
-            without the burden of property management. Powered by <strong>Master Lease Agreements</strong>.
-          </p>
-          {account && (
-            <p className="mt-4 text-emerald-400 text-sm">
-              Connected: {account.address.slice(0, 6)}...{account.address.slice(-4)}
-            </p>
-          )}
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {rwaData.slice(0, 6).map((asset: any) => (
-            <AssetCard
-              key={asset.id}
-              asset={asset}
-              onBuy={handleBuy}
-              hasDID={hasDID}
-            />
-          ))}
+          {rwaData
+            .filter((asset: any) => {
+              // Filter out assets with incomplete data
+              const district = asset.identity?.district || '';
+              const type = asset.identity?.type || '';
+              
+              // Filter out if district contains "?" or "Unknown"
+              if (district.includes('?') || district.includes('Unknown') || district === 'D?') {
+                return false;
+              }
+              
+              // Filter out if type contains "N/A"
+              if (type.includes('N/A')) {
+                return false;
+              }
+              
+              return true;
+            })
+            .slice(0, 6)
+            .map((asset: any) => (
+              <AssetCard
+                key={asset.id}
+                asset={asset}
+                onBuy={handleBuy}
+                hasDID={hasDID}
+              />
+            ))}
         </div>
       </main>
 
@@ -349,6 +485,43 @@ function App({ walletManager }: AppProps) {
         onVerified={handleOCRSuccess}
         alreadyVerified={hasDID}
       />
+
+      {/* Asset Detail Modal */}
+      {selectedAsset && (
+        <AssetDetailModal
+          asset={selectedAsset}
+          isOpen={showAssetDetailModal}
+          onClose={() => {
+            setShowAssetDetailModal(false);
+            setSelectedAsset(null);
+          }}
+          onSwap={(asset: any) => {
+            // Default swap params for backward compatibility
+            const swapParams = asset.swapParams || {
+              fromAsset: 'XRP' as const,
+              toAsset: 'YT' as const,
+              fromAmount: asset.swapAmount || '100',
+              toAssetInfo: {
+                currency: asset.chain_info?.currency || '',
+                issuer: asset.chain_info?.issuer || '',
+                ticker: asset.financials.tokens.yt_ticker
+              }
+            };
+            handleSwap(asset, swapParams);
+          }}
+          hasDID={hasDID}
+        />
+      )}
+
+      {/* Toast Notification */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={() => setToast({ ...toast, isVisible: false })}
+        duration={4000}
+      />
+
     </div>
   );
 }
