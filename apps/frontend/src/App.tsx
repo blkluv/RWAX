@@ -13,7 +13,6 @@ import { HeroSection } from './components/HeroSection';
 import { MarketDepthSection } from './components/MarketDepthSection';
 import { ImpactHeroSection } from './components/ImpactHeroSection';
 import { RWAXHeader } from './components/RWAXHeader';
-import { WelcomePopup } from './components/WelcomePopup';
 import { type ParsedDocumentData } from './utils/documentParser';
 import { Logger, logAction } from './utils/logger';
 import rwaData from './data/rwa_assets.json';
@@ -438,13 +437,6 @@ function App({ walletManager }: AppProps) {
 
       {/* 3. WHITE HERO SECTION - First section user sees */}
       <WhiteHeroSection />
-
-      {/* Welcome Popup - Triggered after scrolling past hero */}
-      <WelcomePopup
-        onVerify={handleVerifyClick}
-        isWalletConnected={!!account}
-        hasDID={hasDID}
-      />
 
       {/* 3.5. PROPERTY LISTING SECTION - Featured Singapore Properties */}
       <PropertyListingSection
