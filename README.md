@@ -1,20 +1,27 @@
-# RWAX
+<p align="center">
+  <img src="assets/XRP-logo.png" alt="XRP" height="60"/>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="assets/Ripple-logo.png" alt="Ripple" height="60"/>
+</p>
 
-Real World Asset Exchange on XRP Ledger. Tokenizing Singapore real estate with compliance-first architecture.
+<h1 align="center">RWAX</h1>
+
+<p align="center">
+  <strong>Real World Asset Exchange on XRP Ledger</strong><br/>
+  Tokenizing Singapore real estate with compliance-first architecture
+</p>
+
+---
 
 ## Overview
 
 RWAX enables fractional ownership of Singapore real estate through XRPL-native tokens. The platform processes 3,200+ properties from URA (Urban Redevelopment Authority) data, applies MAS compliance rules, and creates tradeable yield tokens via AMM pools.
 
-## XRPL Standards
+## Tech Stack
 
-| Standard | Implementation |
-|----------|----------------|
-| XLS-40 | DID-based identity verification with OCR pipeline |
-| XLS-30 | AMM pools for instant XRP/YT swaps |
-| XLS-39 | Clawback compliance for regulatory enforcement |
-| XLS-47 | On-chain price oracles for property valuation |
-| XLS-33 | Issued currency tokens (PT/YT) |
+<p align="center">
+  <img src="assets/techstack.png" alt="RWAX Tech Stack" width="700"/>
+</p>
 
 ## Architecture
 
@@ -26,6 +33,16 @@ Frontend (React)          Oracle (Python)           XRPL Testnet
      ├─ Asset Browser          ├─ Asset Minting          ├─ AMM Pools
      └─ Swap Interface         └─ Oracle Pricing         └─ Payment Routing
 ```
+
+## XRPL Standards
+
+| Standard | Implementation |
+|----------|----------------|
+| XLS-40 | DID-based identity verification with OCR pipeline |
+| XLS-30 | AMM pools for instant XRP/YT swaps |
+| XLS-39 | Clawback compliance for regulatory enforcement |
+| XLS-47 | On-chain price oracles for property valuation |
+| XLS-33 | Issued currency tokens (PT/YT) |
 
 ## Quick Start
 
@@ -68,11 +85,6 @@ yarn oracle:run        # Process property data
 yarn oracle:mint       # Mint assets on XRPL
 yarn sync-data         # Sync oracle → frontend
 ```
-
-## Tech Stack
-
-**Frontend**: React 19, TypeScript, Vite, Tailwind, xrpl 4.5, xrpl-connect
-**Backend**: Python, xrpl-py, pandas, Flask
 
 ## Data Source
 
