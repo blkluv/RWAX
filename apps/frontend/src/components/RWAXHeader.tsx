@@ -3,8 +3,6 @@
 // Pixel-perfect replication of XION design
 
 import React from 'react';
-import { ExternalLink } from 'lucide-react';
-
 import { WalletManager } from 'xrpl-connect';
 import { Logger } from '../utils/logger';
 
@@ -59,16 +57,6 @@ export function RWAXHeader({ account, hasDID, onVerifyClick, walletConnectorRef,
 
         {/* Right: Actions */}
         <div className="flex items-center gap-6">
-          {/* Contact Link with Arrow Icon */}
-          <a 
-            href="#contact" 
-            className="hidden md:flex items-center gap-1.5 text-black text-sm font-medium uppercase tracking-wide hover:text-gray-600 transition-colors"
-            style={{ letterSpacing: '0.05em' }}
-          >
-            Contact
-            <ExternalLink className="w-3.5 h-3.5" strokeWidth={2} />
-          </a>
-
           {/* Wallet Connector - Always functional */}
           <div className="flex items-center gap-3">
             {/* Show Verified badge or Verify button when connected */}

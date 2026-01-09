@@ -27,7 +27,7 @@ export function ImpactHeroSection({ backgroundImage }: ImpactHeroSectionProps) {
         minHeight: '100vh'
       }}
     >
-      {/* Video Background - Low opacity, full screen behind content */}
+      {/* Video Background - Higher visibility with enhanced brightness */}
       <video
         autoPlay
         loop
@@ -41,18 +41,19 @@ export function ImpactHeroSection({ backgroundImage }: ImpactHeroSectionProps) {
           width: '100%',
           height: '100%',
           zIndex: 0,
-          opacity: 0.15 // Low opacity - subtle background
+          opacity: 0.45,
+          filter: 'brightness(1.3) contrast(1.1)'
         }}
       >
         <source src="/xrpl.mp4" type="video/mp4" />
         Your browser does not support the video tag.
       </video>
-      
-      {/* Dark Overlay for text readability */}
-      <div 
-        className="absolute inset-0 w-full h-full bg-black"
-        style={{ 
-          opacity: 0.4,
+
+      {/* Gradient Overlay for text readability while keeping video visible */}
+      <div
+        className="absolute inset-0 w-full h-full"
+        style={{
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.6) 100%)',
           zIndex: 1
         }}
       />

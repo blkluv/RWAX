@@ -8,10 +8,12 @@ import { AssetDetailModal } from './components/AssetDetailModal';
 import { Toast } from './components/Toast';
 // import { BackgroundRipple } from './components/BackgroundRipple'; // Disabled - static design
 import { WhiteHeroSection } from './components/WhiteHeroSection';
+import { PropertyListingSection } from './components/PropertyListingSection';
 import { HeroSection } from './components/HeroSection';
 import { MarketDepthSection } from './components/MarketDepthSection';
 import { ImpactHeroSection } from './components/ImpactHeroSection';
 import { RWAXHeader } from './components/RWAXHeader';
+import { WelcomePopup } from './components/WelcomePopup';
 import { type ParsedDocumentData } from './utils/documentParser';
 import { Logger, logAction } from './utils/logger';
 import rwaData from './data/rwa_assets.json';
@@ -26,10 +28,11 @@ function App({ walletManager }: AppProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
   const [showAssetDetailModal, setShowAssetDetailModal] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info'; isVisible: boolean }>({
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info'; isVisible: boolean; txHash?: string }>({
     message: '',
     type: 'success',
-    isVisible: false
+    isVisible: false,
+    txHash: undefined
   });
 
   const { hasDID, isLoading, isMinting, mintDID, dryRunMode, setDryRunMode } = useIdentity(account?.address, walletManager);
@@ -317,25 +320,31 @@ function App({ walletManager }: AppProps) {
         // Use walletManager.signAndSubmit() for transaction
         const result = await walletManager.signAndSubmit(prepared, true);
         
+        const txHash = result?.hash || result?.result?.hash;
+
         Logger.success("Swap Transaction Submitted", {
-          hash: result?.hash,
+          hash: txHash,
           ticker: asset.chain_info?.ticker || asset.chain_info?.tokens?.yt?.ticker,
           from: fromAsset,
           to: toAsset,
-          amount: fromAmount
+          amount: fromAmount,
+          xrpScan: txHash ? `https://testnet.xrpl.org/transactions/${txHash}` : null
         });
-        
-        // Close modals and show toast notification
+
+        // Close modals and show toast notification with XRPScan link
         setShowAssetDetailModal(false);
         setToast({
-          message: "XLS-30 AMM Swap Complete. Received YT-Tokens.",
+          message: `Swap Complete! ${fromAmount} ${fromAsset} → ${toAsset}`,
           type: 'success',
-          isVisible: true
+          isVisible: true,
+          txHash: txHash
         });
-        
-        if (result?.hash) {
-          Logger.info("Transaction Hash", { hash: result.hash });
-          // Toast already shown, no need for alert
+
+        if (txHash) {
+          Logger.info("Transaction verified on XRPL Testnet", {
+            hash: txHash,
+            explorer: `https://testnet.xrpl.org/transactions/${txHash}`
+          });
         }
       } catch (error: any) {
         Logger.error("Swap Transaction Failed", {
@@ -430,6 +439,20 @@ function App({ walletManager }: AppProps) {
       {/* 3. WHITE HERO SECTION - First section user sees */}
       <WhiteHeroSection />
 
+      {/* Welcome Popup - Triggered after scrolling past hero */}
+      <WelcomePopup
+        onVerify={handleVerifyClick}
+        isWalletConnected={!!account}
+        hasDID={hasDID}
+      />
+
+      {/* 3.5. PROPERTY LISTING SECTION - Featured Singapore Properties */}
+      <PropertyListingSection
+        onBuyProperty={handleBuy}
+        isWalletConnected={!!account}
+        hasDID={hasDID}
+      />
+
       {/* 4. DARK STATS SECTION - Scroll down to see */}
       <HeroSection />
 
@@ -518,7 +541,8 @@ function App({ walletManager }: AppProps) {
         type={toast.type}
         isVisible={toast.isVisible}
         onClose={() => setToast({ ...toast, isVisible: false })}
-        duration={4000}
+        duration={toast.txHash ? 10000 : 4000}
+        txHash={toast.txHash}
       />
 
     </div>

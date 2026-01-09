@@ -179,7 +179,7 @@ def log_verification():
             for key, value in extracted_data.items():
                 if value and value != "Not Found":
                     # Format the key nicely
-                    display_key = key.replace(/([A-Z])/g, ' $1').strip().title()
+                    display_key = ''.join(' ' + c if c.isupper() else c for c in key).strip().title()
                     table.add_row(display_key, str(value))
         
         table.add_row("DID Hash", f"[green]{did_hash}[/green]")

@@ -248,7 +248,7 @@ export function SwapModal({ asset, isOpen, onClose, onSwap, rlusdInfo }: SwapMod
               <span className="text-zinc-400">Trading Fee</span>
               <span className="text-zinc-300">{tradingFee}%</span>
             </div>
-            {parseFloat(xrpAmount) > 0 && (
+            {parseFloat(amount) > 0 && (
               <div className="flex justify-between text-xs mt-1">
                 <span className="text-zinc-400">Fee Amount</span>
                 <span className="text-zinc-300">
