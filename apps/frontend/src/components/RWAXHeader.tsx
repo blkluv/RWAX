@@ -98,11 +98,12 @@ export function RWAXHeader({ account, hasDID, onVerifyClick, walletConnectorRef,
             ) : (
               /* Not Connected: Functional xrpl-wallet-connector with custom styling */
               <div className="wallet-connector-wrapper-rwax">
+                {/* @ts-ignore */}
                 <xrpl-wallet-connector
                   ref={walletConnectorRef}
                   primary-wallet="crossmark"
                   background-color="#FFFFFF"
-                ></xrpl-wallet-connector>
+                />
               </div>
             )}
           </div>

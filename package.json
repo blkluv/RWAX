@@ -4,6 +4,7 @@
   "private": true,
   "description": "RWAX - Real World Asset Exchange on XRPL",
   "scripts": {
+    "build": "cd apps/frontend && yarn build",
     "sync-data": "cp services/oracle/output/rwa_assets.json apps/frontend/src/data/rwa_assets.json && echo '✅ Data synced: oracle → frontend'",
     "oracle:run": "cd services/oracle && python3 clean_data.py",
     "oracle:mint": "cd services/oracle && python3 mint_assets.py",

@@ -240,7 +240,7 @@ export function DemoVerificationModal({ isOpen, onClose }: DemoVerificationModal
       if (parsed.extractedFields.nric) extractedData.nric = parsed.extractedFields.nric;
       if (parsed.extractedFields.passport) extractedData.passport = parsed.extractedFields.passport;
       if (parsed.extractedFields.propertyId) extractedData.propertyId = parsed.extractedFields.propertyId;
-      if (parsed.extractedFields.address) extractedData.address = parsed.extractedFields.address;
+      if ((parsed.extractedFields as any).address) extractedData.address = (parsed.extractedFields as any).address;
       if (parsed.extractedFields.accreditationStatus) extractedData.accreditation = parsed.extractedFields.accreditationStatus;
       if (parsed.extractedFields.taxReference) extractedData.taxReference = parsed.extractedFields.taxReference;
       

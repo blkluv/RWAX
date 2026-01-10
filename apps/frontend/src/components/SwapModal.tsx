@@ -34,8 +34,9 @@ interface SwapModalProps {
         yt?: { currency: string; ticker: string };
       };
       amm?: {
-        trading_fee: number;
-        yt?: { exists: boolean };
+        exists?: boolean;
+        trading_fee?: number;
+        yt?: { exists: boolean; trading_fee?: number };
         pt?: { exists: boolean };
       };
     };
