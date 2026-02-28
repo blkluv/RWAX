@@ -1,6 +1,5 @@
 {
-  "buildCommand": "cd apps/frontend && yarn build",
-  "outputDirectory": "apps/frontend/dist",
-  "installCommand": "yarn install",
-  "framework": "vite"
+  "framework": "vite",
+  "buildCommand": "yarn build",
+  "outputDirectory": "dist"
 }
