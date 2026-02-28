@@ -30,27 +30,27 @@ export function RWAXHeader({ account, hasDID, onVerifyClick, walletConnectorRef,
     }
   };
   return (
-    <header className="fixed top-0 left-0 right-0 w-full z-50 bg-white border-b border-gray-200">
-      <nav className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+    <header className="fixed top-0 left-0 right-0 z-50 w-full bg-white border-b border-gray-200">
+      <nav className="flex items-center justify-between px-6 py-4 mx-auto max-w-7xl">
         {/* Left: Logo */}
         <div className="flex items-center">
-          <h1 className="text-2xl font-bold text-black tracking-tight" style={{ fontFamily: 'sans-serif' }}>
-            RWAX
+          <h1 className="text-2xl font-bold tracking-tight text-black" style={{ fontFamily: 'sans-serif' }}>
+            XRPLRWA
           </h1>
         </div>
 
         {/* Center: Navigation Links - Exact spacing as XION */}
-        <div className="hidden lg:flex items-center gap-8 absolute left-1/2 transform -translate-x-1/2">
-          <a href="#vision" className="text-black text-sm font-medium uppercase tracking-wide hover:text-gray-600 transition-colors" style={{ letterSpacing: '0.05em' }}>
+        <div className="absolute items-center hidden gap-8 transform -translate-x-1/2 lg:flex left-1/2">
+          <a href="#vision" className="text-sm font-medium tracking-wide text-black uppercase transition-colors hover:text-gray-600" style={{ letterSpacing: '0.05em' }}>
             Vision
           </a>
-          <a href="#data" className="text-black text-sm font-medium uppercase tracking-wide hover:text-gray-600 transition-colors" style={{ letterSpacing: '0.05em' }}>
+          <a href="#data" className="text-sm font-medium tracking-wide text-black uppercase transition-colors hover:text-gray-600" style={{ letterSpacing: '0.05em' }}>
             Data
           </a>
-          <a href="#assets" className="text-black text-sm font-medium uppercase tracking-wide hover:text-gray-600 transition-colors" style={{ letterSpacing: '0.05em' }}>
+          <a href="#assets" className="text-sm font-medium tracking-wide text-black uppercase transition-colors hover:text-gray-600" style={{ letterSpacing: '0.05em' }}>
             Assets
           </a>
-          <a href="#live-chart" className="text-black text-sm font-medium uppercase tracking-wide hover:text-gray-600 transition-colors" style={{ letterSpacing: '0.05em' }}>
+          <a href="#live-chart" className="text-sm font-medium tracking-wide text-black uppercase transition-colors hover:text-gray-600" style={{ letterSpacing: '0.05em' }}>
             Live Chart
           </a>
         </div>
@@ -71,7 +71,7 @@ export function RWAXHeader({ account, hasDID, onVerifyClick, walletConnectorRef,
                   <button
                     onClick={onVerifyClick}
                     disabled={isMinting}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 text-sm font-medium uppercase tracking-wide transition-colors disabled:opacity-50"
+                    className="px-4 py-2 text-sm font-medium tracking-wide text-white uppercase transition-colors bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50"
                     style={{ letterSpacing: '0.05em' }}
                   >
                     {isMinting ? 'Verifying...' : 'Verify'}
@@ -84,12 +84,12 @@ export function RWAXHeader({ account, hasDID, onVerifyClick, walletConnectorRef,
             {account ? (
               /* Connected: Show address with disconnect option */
               <div className="flex items-center gap-2">
-                <span className="text-black text-sm font-medium">
+                <span className="text-sm font-medium text-black">
                   {account.address ? `${account.address.slice(0, 6)}...${account.address.slice(-4)}` : 'Connected'}
                 </span>
                 <button
                   onClick={handleDisconnect}
-                  className="bg-black text-white px-6 py-2 text-sm font-medium uppercase tracking-wide hover:bg-gray-900 transition-colors"
+                  className="px-6 py-2 text-sm font-medium tracking-wide text-white uppercase transition-colors bg-black hover:bg-gray-900"
                   style={{ letterSpacing: '0.05em' }}
                 >
                   Disconnect

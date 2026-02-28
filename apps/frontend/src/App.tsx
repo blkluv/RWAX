@@ -418,7 +418,7 @@ function App({ walletManager }: AppProps) {
   };
 
   return (
-    <div className="min-h-screen text-white font-sans selection:bg-emerald-500 selection:text-black bg-black">
+    <div className="min-h-screen font-sans text-white bg-black selection:bg-emerald-500 selection:text-black">
       {/* 0. BACKGROUND RIPPLE EFFECT - DISABLED (static design) */}
       {/* <BackgroundRipple /> */}
       
@@ -455,8 +455,8 @@ function App({ walletManager }: AppProps) {
       <ImpactHeroSection />
 
       {/* 7. MAIN CONTENT (Appears after scroll) */}
-      <main className="max-w-7xl mx-auto p-6 pb-20 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <main className="relative z-10 p-6 pb-20 mx-auto max-w-7xl">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {rwaData
             .filter((asset: any) => {
               // Filter out assets with incomplete data
@@ -487,9 +487,8 @@ function App({ walletManager }: AppProps) {
         </div>
       </main>
 
-      <footer className="relative z-10 text-center py-12 text-xs text-gray-600 border-t border-white/5 bg-black">
-        <p>Contains information from the Private Residential Property dataset accessed from URA API.</p>
-        <p className="mt-2">RWAX Protocol © 2026</p>
+      <footer className="relative z-10 py-12 text-xs text-center text-gray-600 bg-black border-t border-white/5">
+        <p className="mt-2">XRPLRWA Protocol © 2026</p>
       </footer>
 
       {/* Verification Modal */}

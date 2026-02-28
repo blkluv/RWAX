@@ -25,10 +25,9 @@
       "data_hash": "ff414eb9067371d72b47d285506e9abe29f08a6f2c5fce26d276a2178ed1d665"
     },
     "chain_info": {
-      "issuer": "rPYttdvr95gCyhuTSzpZF8zf9Baa7F4UX2",
-      "currency": "59542d53554e2d32380000000000000000000000",
-      "ticker": "YT-SUN-28",
-      "human_name": "Sungrove n.a. >8000 ..."
+      "error": "Only one live display may be active at once",
+      "issuer": "rELrGxBkiBLTWJicSgAdYBHVLwVTNswbFx",
+      "status": "failed"
     }
   },
   {
@@ -57,10 +56,9 @@
       "data_hash": "53ce8236ca1c6c93a359c661eb528e69730506e969a9e20dd702d5bae1a7170a"
     },
     "chain_info": {
-      "issuer": "rPYttdvr95gCyhuTSzpZF8zf9Baa7F4UX2",
-      "currency": "59542d5448452d32380000000000000000000000",
-      "ticker": "YT-THE-28",
-      "human_name": "The Vision n.a."
+      "error": "Only one live display may be active at once",
+      "issuer": "rELrGxBkiBLTWJicSgAdYBHVLwVTNswbFx",
+      "status": "failed"
     }
   },
   {
@@ -89,10 +87,9 @@
       "data_hash": "f089a584b1db24a97f0f92dae7ad08369ce11841bdb3a872c5d2183f81880249"
     },
     "chain_info": {
-      "issuer": "rPYttdvr95gCyhuTSzpZF8zf9Baa7F4UX2",
-      "currency": "59542d53454e2d32380000000000000000000000",
-      "ticker": "YT-SEN-28",
-      "human_name": "Sennett Estate n.a. ..."
+      "error": "Only one live display may be active at once",
+      "issuer": "rELrGxBkiBLTWJicSgAdYBHVLwVTNswbFx",
+      "status": "failed"
     }
   },
   {
