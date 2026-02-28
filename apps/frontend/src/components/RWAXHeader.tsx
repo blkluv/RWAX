@@ -41,6 +41,9 @@ export function RWAXHeader({ account, hasDID, onVerifyClick, walletConnectorRef,
 
         {/* Center: Navigation Links - Exact spacing as XION */}
         <div className="absolute items-center hidden gap-8 transform -translate-x-1/2 lg:flex left-1/2">
+        <a href="https://map.xrplrwa.com" className="text-sm font-medium tracking-wide text-black uppercase transition-colors hover:text-gray-600" style={{ letterSpacing: '0.05em' }}>
+            Map
+          </a>
           <a href="#vision" className="text-sm font-medium tracking-wide text-black uppercase transition-colors hover:text-gray-600" style={{ letterSpacing: '0.05em' }}>
             Vision
           </a>
